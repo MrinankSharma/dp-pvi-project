@@ -56,7 +56,7 @@ class Worker(object):
             worker_index, no_workers, data_type)
         # Initialize the model
         n_train_worker = x_train.shape[0]
-        self.net = linreg_models.LinReg_MFVI_analytic(
+        self.net = linreg_models.LinReg_MFVI_SGD(
             din, n_train_worker, 
             init_seed=seed, no_workers=no_workers)
         self.keys = self.net.get_params()[0]
