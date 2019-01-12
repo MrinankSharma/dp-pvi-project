@@ -56,7 +56,7 @@ class Worker(object):
             worker_index, no_workers, data_type)
         # Initialize the model
         n_train_worker = x_train.shape[0]
-        self.net = linreg_models.LinReg_MFVI_SGD(
+        self.net = linreg_models.LinReg_MFVI_GRA(
             din, n_train_worker, 
             init_seed=seed, no_workers=no_workers)
         self.keys = self.net.get_params()[0]
@@ -105,7 +105,7 @@ if __name__ == "__main__":
     x_train, y_train, x_test, y_test = data_func(0, 1)
     n_train_master = x_train.shape[0]
     in_dim = x_train.shape[1]
-    net = linreg_models.LinReg_MFVI_analytic(in_dim, n_train_master)
+    net = linreg_models.LinReg_MFVI_GRA(in_dim, n_train_master)
     all_keys, all_values = net.get_params()
     ps = ParameterServer.remote(all_keys, all_values)
     

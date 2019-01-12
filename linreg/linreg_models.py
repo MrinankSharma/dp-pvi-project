@@ -121,7 +121,7 @@ class LinReg_MFVI_analytic():
     
     def _create_params(self, init_seed, prior_mean, prior_var):
         no_params = self.din
-        init_var = 1e6*np.ones([no_params])
+        init_var = 2*np.ones([no_params])
         init_mean = np.zeros([no_params])
         init_n2 = 1.0 / init_var
         init_n1 = init_mean / init_var
@@ -286,7 +286,7 @@ class LinReg_MFVI_analytic():
         return ms, vs
 
 
-class LinReg_MFVI_SGD():
+class LinReg_MFVI_GRA():
     """
     Stochastic global variational inference using Adam optimiser
     fully factorised Gaussian approximation
@@ -311,7 +311,7 @@ class LinReg_MFVI_SGD():
         #        prior_mean, prior_var, local_n1, local_n2]
         res = self._create_params(init_seed, prior_mean, prior_var)
         self.no_weights = res[0]
-        self.w_mean, self.w_var = res[1], res[2]
+        self.w_mean, self.w_log_var = res[1], res[2]
         self.w_n1, self.w_n2 = res[3], res[4]
         self.prior_mean, self.prior_var = res[5], res[6]
         self.local_n1, self.local_n2 = res[7], res[8]
@@ -343,20 +343,21 @@ class LinReg_MFVI_SGD():
     def train(self, x_train, y_train):
         N = x_train.shape[0]
         sess = self.sess
-        _, c, c_kl, c_lik = sess.run(
-            [self.train_updates, self.energy_fn, self.kl_term, self.expected_lik],
-            feed_dict={self.xtrain: x_train, self.ytrain: y_train})
-        print(c)
+        for x in range(2000000):
+            _, c, c_kl, c_lik = sess.run(
+                [self.train_updates, self.energy_fn, self.kl_term, self.expected_lik],
+                feed_dict={self.xtrain: x_train, self.ytrain: y_train})
         return np.array([c, c_kl, c_lik])
 
     def get_weights(self):
-        w_mean, w_var = self.sess.run([self.w_mean, self.w_log_var])
-        return w_mean, w_var
+        w_mean, w_log_var = self.sess.run([self.w_mean, self.w_log_var])
+        return w_mean, np.exp(w_var)
 
     def _build_energy(self):
         # compute the expected log likelihood
         no_train = tf.cast(self.n_train, float_type)
-        w_mean, w_var = self.w_mean, self.w_var
+        w_mean, w_log_var = self.w_mean, self.w_log_var
+        w_var = tf.exp(w_log_var)
         const_term = -0.5 * no_train * np.log(2 * np.pi * self.noise_var)
         pred = tf.einsum('nd,d->n', self.xtrain, w_mean)
         ydiff = self.ytrain - pred
@@ -379,15 +380,16 @@ class LinReg_MFVI_SGD():
 
     def _create_params(self, init_seed, prior_mean, prior_var):
         no_params = self.din
-        init_var = 1e6 * np.ones([no_params])
-        init_mean = np.zeros([no_params])
+        # initialise worker to prior mean and variance
+        init_var = prior_var * np.ones([no_params])
+        init_mean = prior_mean * np.zeros([no_params])
         init_n2 = 1.0 / init_var
         init_n1 = init_mean / init_var
 
         with tf.name_scope('variational_cov'):
-            w_var = tf.Variable(
-                tf.constant(init_var, dtype=float_type),
-                name='variance')
+            w_log_var = tf.Variable(
+                tf.constant(np.log(init_var), dtype=float_type),
+                name='log_variance')
             w_mean = tf.Variable(
                 tf.constant(init_mean, dtype=float_type),
                 name='mean')
@@ -420,7 +422,7 @@ class LinReg_MFVI_SGD():
         local_n1 = data_n1 / self.no_workers
         local_n2 = data_n2 / self.no_workers
 
-        res = [no_params, w_mean, w_var, w_n1, w_n2,
+        res = [no_params, w_mean, w_log_var, w_n1, w_n2,
                prior_mean, prior_var, local_n1, local_n2]
         return res
 
@@ -436,7 +438,7 @@ class LinReg_MFVI_SGD():
         self.prior_mean_op = self.prior_mean.assign(self.prior_mean_val)
         self.prior_var_op = self.prior_var.assign(self.prior_var_val)
         self.post_mean_op = self.w_mean.assign(self.post_mean_val)
-        self.post_var_op = self.w_var.assign(self.post_var_val)
+        self.post_var_op = self.w_log_var.assign(self.post_var_val)
         self.post_n1_op = self.w_n1.assign(self.post_n1_val)
         self.post_n2_op = self.w_n2.assign(self.post_n2_val)
 
@@ -463,7 +465,8 @@ class LinReg_MFVI_SGD():
 
     def set_nat_params(self):
         # compute and set natural parameters
-        post_mean, post_var = self.sess.run([self.w_mean, self.w_var])
+        post_mean, post_log_var = self.sess.run([self.w_mean, self.w_log_var])
+        post_var = np.exp(post_log_var)
         post_n2 = 1.0 / post_var
         post_n1 = post_mean / post_var
         self.sess.run(
@@ -504,7 +507,8 @@ class LinReg_MFVI_SGD():
 
     def _build_prediction(self):
         x = self.xtest
-        w_mean, w_var = self.w_mean, self.w_var
+        w_mean, w_log_var = self.w_mean, self.w_log_var
+        w_var = tf.exp(w_log_var)
         mean = tf.einsum('nd,d->n', x, w_mean)
         var = tf.reduce_sum(x * w_var * x, axis=1)
         return mean, var
@@ -544,12 +548,14 @@ class LinReg_MFVI_SGD():
         return ms, vs
 
     def _create_train_step(self):
-        mean_grad, var_grad = self.build_gradient()
+        mean_grad, log_var_grad = self.build_gradient()
         # perform incredibly simple gradient ascent - we are trying to maximise the free energy
-
-        update_m = self.w_mean.assign(self.w_mean + mean_grad)
-        update_v = self.w_var.assign(self.w_var + var_grad)
-        return update_m, update_v, tf.print(mean_grad), tf.print(var_grad)
+        learning_rate = tf.constant([0.00001])
+        update_m = self.w_mean.assign_add(learning_rate*mean_grad)
+        update_v = self.w_log_var.assign_add(learning_rate*log_var_grad)
+        # update_m = self.w_mean.assign([2])
+        # update_v = self.w_var.assign([1/95000])
+        return update_m, update_v, tf.print('mean ', self.w_mean, ' var ', tf.exp(self.w_log_var), ' mean grad ', mean_grad, ' log var grad ', log_var_grad)
 
     def build_gradient(self):
         # build the gradient of the free energy over all datapoints
@@ -557,17 +563,20 @@ class LinReg_MFVI_SGD():
         xTx = tf.einsum('na,nb->ab', self.xtrain, self.xtrain)
         xTy = tf.einsum('na,n->a', self.xtrain, self.ytrain)
 
+        w_var = tf.exp(self.w_log_var)
+        prior_var = self.prior_var
+
         entropy_mean_term = 0
-        entropy_var_term = -0.5 * self.w_var
-        lik_mean_term = -0.5/(self.noise_var) * (2*self.w_mean*xTx - 2*xTy)
-        lik_var_term =  -0.5 / (self.noise_var) * xTx
-        prior_mean_term = (-0.5/self.prior_var)*(2*self.w_mean - 2*self.prior_mean)
-        prior_var_term = (-0.5/self.prior_var)
+        entropy_var_term = 1/(2 * w_var)
+        lik_mean_term = (-0.5/(self.noise_var)) * (2*self.w_mean*xTx - 2*xTy)
+        lik_var_term = (-0.5 / self.noise_var) * xTx
+        prior_mean_term = (-0.5/ prior_var)*(2*self.w_mean - 2*self.prior_mean)
+        prior_var_term = (-0.5/ prior_var)
 
         # sum and reshape into vectors
         mean_term = tf.reshape(entropy_mean_term + lik_mean_term + prior_mean_term, [1])
         var_term = tf.reshape(entropy_var_term + lik_var_term + prior_var_term, [1])
-        return mean_term, var_term
+        return mean_term, w_var*var_term
 
 
 
