@@ -1,5 +1,7 @@
 tensorflow==1.12.0
+tensforflow-probability
 matplotlib
 jupyter
 ray
 redis==2.10.6
+scipy

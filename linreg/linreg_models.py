@@ -4,6 +4,7 @@ from __future__ import print_function
 
 import ray
 import tensorflow as tf
+import tensorflow_probability as tfp
 import numpy as np
 import math
 import time
@@ -23,9 +24,9 @@ class LinReg_MFVI_analytic():
     """
 
     def __init__(self, din, n_train, noise_var=0.01,
-        prior_mean=0.0, prior_var=1.0, 
-        init_seed=0, no_workers=1,
-        single_thread=True):
+                 prior_mean=0.0, prior_var=1.0,
+                 init_seed=0, no_workers=1,
+                 single_thread=True):
         self.din = din
         # input and output placeholders
         self.xtrain = tf.placeholder(float_type, [None, din], 'input')
@@ -51,7 +52,7 @@ class LinReg_MFVI_analytic():
         # build objective and prediction functions
         self.energy_fn, self.kl_term, self.expected_lik = self._build_energy()
         self.predict_m, self.predict_v = self._build_prediction()
-        
+
         self.train_updates = self._create_train_step()
         # launch a session
         if single_thread:
@@ -60,13 +61,13 @@ class LinReg_MFVI_analytic():
                 inter_op_parallelism_threads=1))
         else:
             self.sess = tf.Session()
-        
+
         # Initializing the variables
         init = tf.global_variables_initializer()
         self.sess.run(init)
 
         self.params = TensorFlowVariablesWithScope(
-            self.energy_fn, self.sess, 
+            self.energy_fn, self.sess,
             scope='variational_nat', input_variables=[self.w_n1, self.w_n2])
 
     def _create_train_step(self):
@@ -99,11 +100,11 @@ class LinReg_MFVI_analytic():
         # compute the expected log likelihood
         no_train = tf.cast(self.n_train, float_type)
         w_mean, w_var = self.w_mean, self.w_var
-        const_term = -0.5 * no_train * np.log(2*np.pi*self.noise_var)
+        const_term = -0.5 * no_train * np.log(2 * np.pi * self.noise_var)
         pred = tf.einsum('nd,d->n', self.xtrain, w_mean)
         ydiff = self.ytrain - pred
-        quad_term = -0.5 / self.noise_var * tf.reduce_sum(ydiff**2)
-        xxT = tf.reduce_sum(self.xtrain**2, axis=0)
+        quad_term = -0.5 / self.noise_var * tf.reduce_sum(ydiff ** 2)
+        xxT = tf.reduce_sum(self.xtrain ** 2, axis=0)
         trace_term = -0.5 / self.noise_var * tf.reduce_sum(xxT * w_var)
         expected_lik = const_term + quad_term + trace_term
 
@@ -111,46 +112,46 @@ class LinReg_MFVI_analytic():
         const_term = -0.5 * self.no_weights
         log_std_diff = tf.log(self.prior_var) - tf.log(w_var)
         log_std_diff = 0.5 * tf.reduce_sum(log_std_diff)
-        mu_diff_term = (w_var + (self.prior_mean - w_mean)**2) / self.prior_var
+        mu_diff_term = (w_var + (self.prior_mean - w_mean) ** 2) / self.prior_var
         mu_diff_term = 0.5 * tf.reduce_sum(mu_diff_term)
         kl = const_term + log_std_diff + mu_diff_term
 
         kl_term = kl / no_train
         expected_lik_term = - expected_lik
         return kl_term + expected_lik_term, kl_term, expected_lik_term
-    
+
     def _create_params(self, init_seed, prior_mean, prior_var):
         no_params = self.din
-        init_var = 2*np.ones([no_params])
+        init_var = 2 * np.ones([no_params])
         init_mean = np.zeros([no_params])
         init_n2 = 1.0 / init_var
         init_n1 = init_mean / init_var
 
         with tf.name_scope('variational_cov'):
             w_var = tf.Variable(
-                tf.constant(init_var, dtype=float_type), 
+                tf.constant(init_var, dtype=float_type),
                 name='variance')
             w_mean = tf.Variable(
-                tf.constant(init_mean, dtype=float_type), 
+                tf.constant(init_mean, dtype=float_type),
                 name='mean')
 
         with tf.name_scope('variational_nat'):
             w_n1 = tf.Variable(
-                tf.constant(init_n1, dtype=float_type), 
+                tf.constant(init_n1, dtype=float_type),
                 name='precision_x_mean')
             w_n2 = tf.Variable(
-                tf.constant(init_n2, dtype=float_type), 
+                tf.constant(init_n2, dtype=float_type),
                 name='precision')
 
         prior_mean_val = prior_mean * np.ones([no_params])
         prior_var_val = prior_var * np.ones([no_params])
         with tf.name_scope('prior'):
             prior_mean = tf.Variable(
-                tf.constant(prior_mean_val, dtype=float_type), 
+                tf.constant(prior_mean_val, dtype=float_type),
                 trainable=False,
                 name='mean')
             prior_var = tf.Variable(
-                tf.constant(prior_var_val, dtype=float_type), 
+                tf.constant(prior_var_val, dtype=float_type),
                 trainable=False,
                 name='variance')
 
@@ -162,7 +163,7 @@ class LinReg_MFVI_analytic():
         local_n1 = data_n1 / self.no_workers
         local_n2 = data_n2 / self.no_workers
 
-        res = [no_params, w_mean, w_var, w_n1, w_n2, 
+        res = [no_params, w_mean, w_var, w_n1, w_n2,
                prior_mean, prior_var, local_n1, local_n2]
         return res
 
@@ -227,16 +228,16 @@ class LinReg_MFVI_analytic():
         self.set_nat_params()
         # update local factor
         post_n1, post_n2, prior_mean, prior_var = self.sess.run([
-                self.w_n1, self.w_n2, self.prior_mean, self.prior_var])
+            self.w_n1, self.w_n2, self.prior_mean, self.prior_var])
         prior_n2 = 1.0 / prior_var
         prior_n1 = prior_mean / prior_var
         new_local_n1 = post_n1 - prior_n1
         new_local_n2 = post_n2 - prior_n2
         old_local_n1 = self.local_n1
         old_local_n2 = self.local_n2
-        new_local_n1 = damping * old_local_n1 + (1.0-damping) * new_local_n1
-        new_local_n2 = damping * old_local_n2 + (1.0-damping) * new_local_n2
-        new_local_n2[np.where(new_local_n2<0)] = 0
+        new_local_n1 = damping * old_local_n1 + (1.0 - damping) * new_local_n1
+        new_local_n2 = damping * old_local_n2 + (1.0 - damping) * new_local_n2
+        new_local_n2[np.where(new_local_n2 < 0)] = 0
         delta_n1 = new_local_n1 - old_local_n1
         delta_n2 = new_local_n2 - old_local_n2
         self.local_n1 = new_local_n1
@@ -551,11 +552,12 @@ class LinReg_MFVI_GRA():
         mean_grad, log_var_grad = self.build_gradient()
         # perform incredibly simple gradient ascent - we are trying to maximise the free energy
         learning_rate = tf.constant([0.00001])
-        update_m = self.w_mean.assign_add(learning_rate*mean_grad)
-        update_v = self.w_log_var.assign_add(learning_rate*log_var_grad)
+        update_m = self.w_mean.assign_add(learning_rate * mean_grad)
+        update_v = self.w_log_var.assign_add(learning_rate * log_var_grad)
         # update_m = self.w_mean.assign([2])
         # update_v = self.w_var.assign([1/95000])
-        return update_m, update_v, tf.print('mean ', self.w_mean, ' var ', tf.exp(self.w_log_var), ' mean grad ', mean_grad, ' log var grad ', log_var_grad)
+        return update_m, update_v, tf.print('mean ', self.w_mean, ' var ', tf.exp(self.w_log_var), ' mean grad ',
+                                            mean_grad, ' log var grad ', log_var_grad)
 
     def build_gradient(self):
         # build the gradient of the free energy over all datapoints
@@ -567,17 +569,387 @@ class LinReg_MFVI_GRA():
         prior_var = self.prior_var
 
         entropy_mean_term = 0
-        entropy_var_term = 1/(2 * w_var)
-        lik_mean_term = (-0.5/(self.noise_var)) * (2*self.w_mean*xTx - 2*xTy)
+        entropy_var_term = 1 / (2 * w_var)
+        lik_mean_term = (-0.5 / (self.noise_var)) * (2 * self.w_mean * xTx - 2 * xTy)
         lik_var_term = (-0.5 / self.noise_var) * xTx
-        prior_mean_term = (-0.5/ prior_var)*(2*self.w_mean - 2*self.prior_mean)
-        prior_var_term = (-0.5/ prior_var)
+        prior_mean_term = (-0.5 / prior_var) * (2 * self.w_mean - 2 * self.prior_mean)
+        prior_var_term = (-0.5 / prior_var)
 
         # sum and reshape into vectors
         mean_term = tf.reshape(entropy_mean_term + lik_mean_term + prior_mean_term, [1])
         var_term = tf.reshape(entropy_var_term + lik_var_term + prior_var_term, [1])
-        return mean_term, w_var*var_term
+        return mean_term, w_var * var_term
 
 
+class LinReg_MFVI_DPSGD():
+    """
+    Stochastic global variational inference using Differentially
+    Private Stochastic Gradient Ascent
+    fully factorised Gaussian approximation
+    variational parameters: mu and log(var)
+    """
 
+    def __init__(self, din, n_train, noise_var=0.01,
+                 prior_mean=0.0, prior_var=1.0,
+                 init_seed=0, no_workers=1, gradient_bound=1,
+                 learning_rate=1e-3, noise_scale=1, lot_size=50,
+                 num_iterations=10000, single_thread=True):
+        self.din = din
+        # input and output placeholders
+        self.xtrain = tf.placeholder(float_type, [None, din], 'input')
+        self.xtest = tf.placeholder(float_type, [None, din], 'test_input')
+        self.ytrain = tf.placeholder(float_type, [None], 'target')
+        self.n_train = n_train
+        self.no_workers = no_workers
+        self.noise_var = noise_var
 
+        # DP-SGD Paramters
+        self.gradient_bound = gradient_bound
+        self.learning_rate = tf.constant(learning_rate, dtype=float_type)
+        self.noise_scale = noise_scale
+        self.num_iterations = num_iterations
+        self.lot_size = lot_size
+
+        res = self._create_params(init_seed, prior_mean, prior_var)
+        self.no_weights = res[0]
+        self.w_mean, self.w_log_var = res[1], res[2]
+        self.w_n1, self.w_n2 = res[3], res[4]
+        self.prior_mean, self.prior_var = res[5], res[6]
+        self.local_n1, self.local_n2 = res[7], res[8]
+
+        noise_var = noise_scale * noise_scale * gradient_bound * gradient_bound
+        # create noise distribution for convience
+        # multiple dimension by 2 since there is a mean and variance for each dimension
+        self.noise_dist = tfp.distributions.MultivariateNormalDiag(loc=np.zeros(2 * din),
+                                                                   scale_diag=noise_var * np.ones(2 * din))
+
+        # create helper assignment ops
+        self._create_assignment_ops()
+
+        # build objective and prediction functions
+        self.energy_fn, self.kl_term, self.expected_lik = self._build_energy()
+        self.predict_m, self.predict_v = self._build_prediction()
+
+        self.train_updates = self._create_train_step()
+        # launch a session
+        if single_thread:
+            self.sess = tf.Session(config=tf.ConfigProto(
+                intra_op_parallelism_threads=1,
+                inter_op_parallelism_threads=1))
+        else:
+            self.sess = tf.Session()
+
+        # Initializing the variables
+        init = tf.global_variables_initializer()
+        self.sess.run(init)
+
+        self.params = TensorFlowVariablesWithScope(
+            self.energy_fn, self.sess,
+            scope='variational_nat', input_variables=[self.w_n1, self.w_n2])
+
+    def train(self, x_train, y_train):
+        N = x_train.shape[0]
+        sess = self.sess
+        for x in range(self.num_iterations):
+            _, c, c_kl, c_lik = sess.run(
+                [self.train_updates, self.energy_fn, self.kl_term, self.expected_lik],
+                feed_dict={self.xtrain: x_train, self.ytrain: y_train})
+        return np.array([c, c_kl, c_lik])
+
+    def get_weights(self):
+        w_mean, w_log_var = self.sess.run([self.w_mean, self.w_log_var])
+        return w_mean, np.exp(w_log_var)
+
+    def _build_energy(self):
+        # compute the expected log likelihood
+        no_train = tf.cast(self.n_train, float_type)
+        w_mean, w_log_var = self.w_mean, self.w_log_var
+        w_var = tf.exp(w_log_var)
+        const_term = -0.5 * no_train * np.log(2 * np.pi * self.noise_var)
+        pred = tf.einsum('nd,d->n', self.xtrain, w_mean)
+        ydiff = self.ytrain - pred
+        quad_term = -0.5 / self.noise_var * tf.reduce_sum(ydiff ** 2)
+        xxT = tf.reduce_sum(self.xtrain ** 2, axis=0)
+        trace_term = -0.5 / self.noise_var * tf.reduce_sum(xxT * w_var)
+        expected_lik = const_term + quad_term + trace_term
+
+        # compute the kl term analytically
+        const_term = -0.5 * self.no_weights
+        log_std_diff = tf.log(self.prior_var) - tf.log(w_var)
+        log_std_diff = 0.5 * tf.reduce_sum(log_std_diff)
+        mu_diff_term = (w_var + (self.prior_mean - w_mean) ** 2) / self.prior_var
+        mu_diff_term = 0.5 * tf.reduce_sum(mu_diff_term)
+        kl = const_term + log_std_diff + mu_diff_term
+
+        kl_term = kl / no_train
+        expected_lik_term = - expected_lik
+        return kl_term + expected_lik_term, kl_term, expected_lik_term
+
+    def _create_params(self, init_seed, prior_mean, prior_var):
+        no_params = self.din
+        # initialise worker to prior mean and variance
+        init_var = prior_var * np.ones([no_params])
+        init_mean = prior_mean * np.zeros([no_params])
+        init_n2 = 1.0 / init_var
+        init_n1 = init_mean / init_var
+
+        with tf.name_scope('variational_cov'):
+            w_log_var = tf.Variable(
+                tf.constant(np.log(init_var), dtype=float_type),
+                name='log_variance')
+            w_mean = tf.Variable(
+                tf.constant(init_mean, dtype=float_type),
+                name='mean')
+
+        with tf.name_scope('variational_nat'):
+            w_n1 = tf.Variable(
+                tf.constant(init_n1, dtype=float_type),
+                name='precision_x_mean')
+            w_n2 = tf.Variable(
+                tf.constant(init_n2, dtype=float_type),
+                name='precision')
+
+        prior_mean_val = prior_mean * np.ones([no_params])
+        prior_var_val = prior_var * np.ones([no_params])
+        with tf.name_scope('prior'):
+            prior_mean = tf.Variable(
+                tf.constant(prior_mean_val, dtype=float_type),
+                trainable=False,
+                name='mean')
+            prior_var = tf.Variable(
+                tf.constant(prior_var_val, dtype=float_type),
+                trainable=False,
+                name='variance')
+
+        no_workers = self.no_workers
+        prior_n1 = prior_mean_val / prior_var_val
+        prior_n2 = 1.0 / prior_var_val
+        data_n1 = init_n1 - prior_n1
+        data_n2 = init_n2 - prior_n2
+        local_n1 = data_n1 / self.no_workers
+        local_n2 = data_n2 / self.no_workers
+
+        res = [no_params, w_mean, w_log_var, w_n1, w_n2,
+               prior_mean, prior_var, local_n1, local_n2]
+        return res
+
+    def _create_assignment_ops(self):
+        # create helper assignment ops
+        self.prior_mean_val = tf.placeholder(dtype=float_type)
+        self.prior_var_val = tf.placeholder(dtype=float_type)
+        self.post_mean_val = tf.placeholder(dtype=float_type)
+        self.post_var_val = tf.placeholder(dtype=float_type)
+        self.post_n1_val = tf.placeholder(dtype=float_type)
+        self.post_n2_val = tf.placeholder(dtype=float_type)
+
+        self.prior_mean_op = self.prior_mean.assign(self.prior_mean_val)
+        self.prior_var_op = self.prior_var.assign(self.prior_var_val)
+        self.post_mean_op = self.w_mean.assign(self.post_mean_val)
+        self.post_var_op = self.w_log_var.assign(self.post_var_val)
+        self.post_n1_op = self.w_n1.assign(self.post_n1_val)
+        self.post_n2_op = self.w_n2.assign(self.post_n2_val)
+
+    def set_params(self, variable_names, new_params, update_prior=True):
+        # set natural parameters
+        self.params.set_weights(dict(zip(variable_names, new_params)))
+        # compute and set covariance parameters
+        post_n1, post_n2 = self.sess.run([self.w_n1, self.w_n2])
+        # print([post_n1, post_n2])
+        post_var = 1.0 / post_n2
+        post_mean = post_n1 / post_n2
+        self.sess.run(
+            [self.post_var_op, self.post_mean_op],
+            feed_dict={self.post_var_val: post_var,
+                       self.post_mean_val: post_mean})
+        if update_prior:
+            # compute and set prior
+            prior_n1 = post_n1 - self.local_n1
+            prior_n2 = post_n2 - self.local_n2
+            prior_var = 1.0 / prior_n2
+            prior_mean = prior_n1 / prior_n2
+            self.sess.run([self.prior_mean_op, self.prior_var_op], feed_dict={
+                self.prior_mean_val: prior_mean, self.prior_var_val: prior_var})
+
+    def set_nat_params(self):
+        # compute and set natural parameters
+        post_mean, post_log_var = self.sess.run([self.w_mean, self.w_log_var])
+        post_var = np.exp(post_log_var)
+        post_n2 = 1.0 / post_var
+        post_n1 = post_mean / post_var
+        self.sess.run(
+            [self.post_n1_op, self.post_n2_op],
+            feed_dict={self.post_n1_val: post_n1,
+                       self.post_n2_val: post_n2})
+
+    def get_nat_params(self):
+        self.set_nat_params()
+        return self.sess.run([self.w_n1, self.w_n2])
+
+    def get_params(self):
+        self.set_nat_params()
+        # get natural params and return
+        params = self.params.get_weights()
+        return list(params.keys()), list(params.values())
+
+    def get_param_diff(self, damping=0.5):
+        self.set_nat_params()
+        # update local factor
+        post_n1, post_n2, prior_mean, prior_var = self.sess.run([
+            self.w_n1, self.w_n2, self.prior_mean, self.prior_var])
+        prior_n2 = 1.0 / prior_var
+        prior_n1 = prior_mean / prior_var
+        new_local_n1 = post_n1 - prior_n1
+        new_local_n2 = post_n2 - prior_n2
+        old_local_n1 = self.local_n1
+        old_local_n2 = self.local_n2
+        new_local_n1 = damping * old_local_n1 + (1.0 - damping) * new_local_n1
+        new_local_n2 = damping * old_local_n2 + (1.0 - damping) * new_local_n2
+        new_local_n2[np.where(new_local_n2 < 0)] = 0
+        delta_n1 = new_local_n1 - old_local_n1
+        delta_n2 = new_local_n2 - old_local_n2
+        self.local_n1 = new_local_n1
+        self.local_n2 = new_local_n2
+        param_deltas = [delta_n1, delta_n2]
+        return param_deltas
+
+    def _build_prediction(self):
+        x = self.xtest
+        w_mean, w_log_var = self.w_mean, self.w_log_var
+        w_var = tf.exp(w_log_var)
+        mean = tf.einsum('nd,d->n', x, w_mean)
+        var = tf.reduce_sum(x * w_var * x, axis=1)
+        return mean, var
+
+    def close_session(self):
+        self.sess.close()
+
+    def compute_energy(self, x_train, y_train, batch_size=None):
+        sess = self.sess
+        c = sess.run(
+            [self.energy_fn],
+            feed_dict={self.xtrain: x_train, self.ytrain: y_train})[0]
+        return c
+
+    def prediction(self, x_test, batch_size=500):
+        # Test model
+        N = x_test.shape[0]
+        total_batch = int(np.ceil(N * 1.0 / batch_size))
+        for i in range(total_batch):
+            start_ind = i * batch_size
+            end_ind = np.min([(i + 1) * batch_size, N])
+            batch_x = x_test[start_ind:end_ind, :]
+            m, v = self.sess.run(
+                [self.predict_m, self.predict_v],
+                feed_dict={self.xtest: batch_x})
+            if i == 0:
+                ms, vs = m, v
+            else:
+                if len(m.shape) == 3:
+                    concat_axis = 1
+                else:
+                    concat_axis = 0
+                ms = np.concatenate(
+                    (ms, m), axis=concat_axis)
+                vs = np.concatenate(
+                    (vs, v), axis=concat_axis)
+        return ms, vs
+
+    def _create_train_step(self):
+        # mean_grad, log_var_grad = self.build_gradient()
+        # perform incredibly simple gradient ascent - we are trying to maximise the free energy
+        mean_noisy_grad, noisy_log_var_grad = self.build_noisy_partial_gradient()
+        update_m = self.w_mean.assign_add(self.learning_rate * mean_noisy_grad)
+        update_lv = self.w_log_var.assign_add(self.learning_rate * noisy_log_var_grad)
+        # approximately true optimal parameters - to check if gradient is small enough
+        # update_m = self.w_mean.assign([2])
+        # update_lv = self.w_log_var.assign([tf.log(1/95000)])
+        return update_m, update_lv
+
+    def build_gradient(self):
+        # build the gradient of the free energy over all datapoints
+        # note that the input to this function are values which are being investigated.
+        xTx = tf.einsum('na,nb->ab', self.xtrain, self.xtrain)
+        xTy = tf.einsum('na,n->a', self.xtrain, self.ytrain)
+
+        w_var = tf.exp(self.w_log_var)
+        prior_var = self.prior_var
+
+        entropy_mean_term = 0
+        entropy_var_term = 1 / (2 * w_var)
+        lik_mean_term = (-0.5 / (self.noise_var)) * (2 * self.w_mean * xTx - 2 * xTy)
+        lik_var_term = (-0.5 / self.noise_var) * xTx
+        prior_mean_term = (-0.5 / prior_var) * (2 * self.w_mean - 2 * self.prior_mean)
+        prior_var_term = (-0.5 / prior_var)
+
+        # sum and reshape into vectors
+        mean_term = tf.reshape(entropy_mean_term + lik_mean_term + prior_mean_term, [1])
+        var_term = tf.reshape(entropy_var_term + lik_var_term + prior_var_term, [1])
+        return mean_term, w_var * var_term
+
+    def select_lot(self, lot_size, x, y):
+        # select lot to perform SGD on
+        N = x.shape[0]
+        indices = np.random.choice(np.arange(0, N, 1), lot_size, replace=False)
+        x_red = x[indices]
+        y_red = y[indices]
+        return [x_red, y_red]
+
+    def clip_sum_gradients(self, mean_indiv_term, var_indiv_term):
+        c_t = self.gradient_bound
+        grads = np.sqrt(np.square(mean_indiv_term) + np.square(var_indiv_term))
+        factors = np.max(np.stack((grads / c_t, np.ones(grads.size))), axis=0)
+        clipped_mean_grads = sum(mean_indiv_term / factors)
+        clipped_var_grad = sum(var_indiv_term / factors)
+        return clipped_mean_grads.astype(np.float32), clipped_var_grad.astype(np.float32)
+
+    def build_noisy_partial_gradient(self):
+        # build gradient of the free energy over a lot_size datapoints for stochastic
+        # gradient descent
+        # reduced versions of the training data
+        red = tf.py_func(self.select_lot, [self.lot_size, self.xtrain, self.ytrain], (float_type, float_type))
+        L = self.lot_size
+        # use shape operator, because the shape is able to vary at runtime
+        N = tf.shape(self.xtrain)[0]
+
+        x_red = red[0]
+        y_red = red[1]
+
+        # set shapes - we know that the reduced input versions will be of this shape (by definition)
+        x_red.set_shape([L, 1])
+        y_red.set_shape([L])
+
+        # now this needs to be stored per individual. create 1d vectors for each results
+        xTx_i = tf.einsum('na,na->n', x_red, x_red)
+        xTy_i = tf.einsum('na,n->n', x_red, y_red)
+
+        w_var = tf.exp(self.w_log_var)
+        prior_var = self.prior_var
+
+        # these are now individual terms
+        lik_mean_term_i = (-0.5 / (self.noise_var)) * (2 * self.w_mean * xTx_i - 2 * xTy_i)
+        lik_var_term_i = (-0.5 / self.noise_var) * xTx_i
+
+        # ensure it is float 32
+        prefactor = tf.cast(1 / N, dtype=float_type)
+        # these terms needs to be rescaling by 1/N (summed later on)
+        entropy_mean_term = 0
+        entropy_var_term = prefactor * 1 / (2 * w_var)
+        prior_mean_term = prefactor * (-0.5 / prior_var) * (2 * self.w_mean - 2 * self.prior_mean)
+        prior_var_term = prefactor * (-0.5 / prior_var)
+
+        # sum and reshape into vectors
+        mean_term_i = entropy_mean_term + lik_mean_term_i + prior_mean_term
+        var_term_i = entropy_var_term + lik_var_term_i + prior_var_term
+        mean_term, var_term = tf.py_func(self.clip_sum_gradients, [mean_term_i, var_term_i], (float_type, float_type))
+        # now add noise to the term - sample from noise term and then add to the mean and variance terms to create a
+        # noisy gradient
+        noise = self.noise_dist.sample()
+        noisy_mean_term = tf.reshape(mean_term + tf.cast(noise[0], dtype=float_type), [1])
+        # rescale as parameterised in terms of the log of the variance since the variance must remain positive
+        noisy_log_var_term = tf.reshape(w_var * (var_term + tf.cast(noise[1], dtype=float_type)), [1])
+        return noisy_mean_term, noisy_log_var_term
+
+    def track_privacy_moments_accountant(self):
+        # note that in this class, the settings used are the same for every iteration. Therefore, the numerical
+        # integration required can be performed once and then multiplied
+        pass
