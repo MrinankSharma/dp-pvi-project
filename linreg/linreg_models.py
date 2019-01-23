@@ -585,7 +585,7 @@ class LinReg_MFVI_DPSGD():
     variational parameters: mu and log(var)
     """
 
-    def __init__(self, din, n_train, noise_var=0.01,
+    def __init__(self, din, n_train, accountant, noise_var=0.01,
                  prior_mean=0.0, prior_var=1.0,
                  init_seed=0, no_workers=1, gradient_bound=1,
                  learning_rate=1e-3, dpsgd_noise_scale=1, lot_size=50,
@@ -598,6 +598,8 @@ class LinReg_MFVI_DPSGD():
         self.n_train = n_train
         self.no_workers = no_workers
         self.noise_var = noise_var
+
+        self.accountant = accountant
 
         # DP-SGD Paramters
         self.gradient_bound = gradient_bound
@@ -646,10 +648,16 @@ class LinReg_MFVI_DPSGD():
     def train(self, x_train, y_train):
         N = x_train.shape[0]
         sess = self.sess
+        # really, we should cache this, but this won't happen for now.
+        self.accountant.log_moments_increment = self.generate_log_moments(N, self.accountant.max_lambda)
         for x in range(self.num_iterations):
-            _, c, c_kl, c_lik = sess.run(
-                [self.train_updates, self.energy_fn, self.kl_term, self.expected_lik],
-                feed_dict={self.xtrain: x_train, self.ytrain: y_train})
+            if not self.account.should_stop:
+                _, c, c_kl, c_lik = sess.run(
+                    [self.train_updates, self.energy_fn, self.kl_term, self.expected_lik],
+                    feed_dict={self.xtrain: x_train, self.ytrain: y_train})
+                self.accountant.update_privacy_budget()
+            else:
+                print('Did not train model: privacy budget exceeded')
         return np.array([c, c_kl, c_lik])
 
     def get_weights(self):
