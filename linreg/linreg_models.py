@@ -2,19 +2,16 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import ray
 import tensorflow as tf
 import tensorflow_probability as tfp
 import numpy as np
 import math
-import time
 from tfutils import TensorFlowVariablesWithScope
-import pdb
-import sys
 
 float_type = tf.float32
 int_type = tf.int32
 
+import mpmath as mp
 
 class LinReg_MFVI_analytic():
     """
@@ -89,7 +86,6 @@ class LinReg_MFVI_analytic():
         _, c, c_kl, c_lik = sess.run(
             [self.train_updates, self.energy_fn, self.kl_term, self.expected_lik],
             feed_dict={self.xtrain: x_train, self.ytrain: y_train})
-        print("free energy: {}".format(c))
         return np.array([c, c_kl, c_lik])
 
     def get_weights(self):
@@ -592,8 +588,8 @@ class LinReg_MFVI_DPSGD():
     def __init__(self, din, n_train, noise_var=0.01,
                  prior_mean=0.0, prior_var=1.0,
                  init_seed=0, no_workers=1, gradient_bound=1,
-                 learning_rate=1e-3, noise_scale=1, lot_size=50,
-                 num_iterations=10000, single_thread=True):
+                 learning_rate=1e-3, dpsgd_noise_scale=1, lot_size=50,
+                 num_iterations=100, single_thread=True):
         self.din = din
         # input and output placeholders
         self.xtrain = tf.placeholder(float_type, [None, din], 'input')
@@ -606,7 +602,7 @@ class LinReg_MFVI_DPSGD():
         # DP-SGD Paramters
         self.gradient_bound = gradient_bound
         self.learning_rate = tf.constant(learning_rate, dtype=float_type)
-        self.noise_scale = noise_scale
+        self.dpsgd_noise_scale = dpsgd_noise_scale
         self.num_iterations = num_iterations
         self.lot_size = lot_size
 
@@ -617,7 +613,7 @@ class LinReg_MFVI_DPSGD():
         self.prior_mean, self.prior_var = res[5], res[6]
         self.local_n1, self.local_n2 = res[7], res[8]
 
-        noise_var = noise_scale * noise_scale * gradient_bound * gradient_bound
+        noise_var = dpsgd_noise_scale * dpsgd_noise_scale * gradient_bound * gradient_bound
         # create noise distribution for convience
         # multiple dimension by 2 since there is a mean and variance for each dimension
         self.noise_dist = tfp.distributions.MultivariateNormalDiag(loc=np.zeros(2 * din),
@@ -949,7 +945,105 @@ class LinReg_MFVI_DPSGD():
         noisy_log_var_term = tf.reshape(w_var * (var_term + tf.cast(noise[1], dtype=float_type)), [1])
         return noisy_mean_term, noisy_log_var_term
 
-    def track_privacy_moments_accountant(self):
+    @staticmethod
+    def to_np_float_64(v):
+        if math.isnan(v) or math.isinf(v):
+            return np.inf
+        else:
+            return np.float64(v)
+
+    @staticmethod
+    def pdf_gauss(x, sigma, mean):
+        return mp.mpf(1.) / mp.sqrt(mp.mpf("2.") * sigma ** 2 * mp.pi) * mp.exp(
+            - (x - mean) ** 2 / (mp.mpf("2.") * sigma ** 2))
+
+    @staticmethod
+    def get_I1_I2_lambda(lambda_val, pdf1, pdf2):
+        I1_func = lambda x: pdf1(x) * (pdf1(x) / pdf2(x)) ** lambda_val
+        I2_func = lambda x: pdf2(x) * (pdf2(x) / pdf1(x)) ** lambda_val
+        return I1_func, I2_func
+
+    def generate_log_moments(self, N, max_lambda):
+        L = self.lot_size
+        q = L / N
+
+        # generate pdfs which are to be integrated numerically
+        pdf1 = lambda x: LinReg_MFVI_DPSGD.pdf_gauss(x, self.dpsgd_noise_scale, mp.mpf(0))
+        pdf2 = lambda x: (1 - q) * LinReg_MFVI_DPSGD.pdf_gauss(x, self.dpsgd_noise_scale, mp.mpf(0)) + \
+                         q * LinReg_MFVI_DPSGD.pdf_gauss(x, self.dpsgd_noise_scale, mp.mpf(1))
+
+        # placeholder for alpha_M(lambda) for each iteration
+        alpha_M_lambda = np.zeros(max_lambda)
+
+        for lambda_val in range(1, max_lambda+1):
+            # it isn't defined which dataset is D and which is D' - thus consider both and take the maximum
+            I1_func, I2_func = self.get_I1_I2_lambda(lambda_val, pdf1, pdf2)
+            I1_val, _ = mp.quad(I1_func, [-mp.inf, mp.inf], error=True)
+            I2_val, _ = mp.quad(I2_func, [-mp.inf, mp.inf], error=True)
+
+            I1_val = LinReg_MFVI_DPSGD.to_np_float_64(I1_val)
+            I2_val = LinReg_MFVI_DPSGD.to_np_float_64(I2_val)
+
+            if I1_val > I2_val:
+                alpha_M_lambda[lambda_val - 1] = np.log(I1_val)
+            else:
+                alpha_M_lambda[lambda_val - 1] = np.log(I2_val)
+
+        return alpha_M_lambda
+
+    def track_privacy_moments_accountant_fixed_delta(self, N, max_lambda_in, num_intervals, delta):
         # note that in this class, the settings used are the same for every iteration. Therefore, the numerical
         # integration required can be performed once and then multiplied
-        pass
+
+        max_lambda = int(np.ceil(max_lambda_in))
+
+        # generate log moments
+        num_iterations = self.num_iterations
+        log_moments = self.generate_log_moments(N, max_lambda)
+
+        # total evals
+        total_evals = num_intervals * num_iterations
+        epsilons = np.zeros(total_evals)
+
+        # convert to deltas given fixed epsilon for each iteration
+        for i in range(1, total_evals+1):
+            eps = np.inf
+            for lambda_val in range(1, max_lambda+1):
+                current_eps_bound = (1 / lambda_val) * ((i * log_moments[lambda_val - 1]) - np.log(delta))
+                # use the smallest upper bound for the tightest guarantee
+                if current_eps_bound < eps:
+                    eps = current_eps_bound
+            # store running track...
+            epsilons[i - 1] = eps
+
+        epoch_sf = self.lot_size/N
+
+        return epsilons[-1], epsilons, total_evals, epoch_sf
+
+    def track_privacy_adv_composition_fixed_delta(self, N, num_intervals, delta):
+        L = self.lot_size
+        q = L / N
+        num_iterations = self.num_iterations
+        total_evals = num_iterations * num_intervals
+        epsilons = np.zeros(total_evals)
+
+        delta_prime = 0.1*delta
+
+        for k in range(1, total_evals+1):
+            amp_delta_i = (delta - delta_prime) / k
+            delta_i = amp_delta_i / q
+
+            beta = np.sqrt(2 * np.log(1.25 / delta_i))
+            eps_i = beta / self.dpsgd_noise_scale
+
+            # try amplification
+            eps_i_amp = np.log10(1 + (q * (np.exp(eps_i) - 1)))
+            if eps_i_amp < eps_i:
+                eps_i = eps_i_amp
+
+            # compose back
+            eps_tot = (np.sqrt(2 * k * np.log(1 / delta_prime)) * eps_i) + (k * eps_i * (np.exp(eps_i) - 1))
+            epsilons[k-1] = eps_tot
+
+        return epsilons[-1], epsilons, total_evals, q
+
