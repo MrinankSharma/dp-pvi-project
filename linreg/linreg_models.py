@@ -648,17 +648,18 @@ class LinReg_MFVI_DPSGD():
     def train(self, x_train, y_train):
         N = x_train.shape[0]
         sess = self.sess
-        # really, we should cache this, but this won't happen for now.
-        self.accountant.log_moments_increment = self.generate_log_moments(N, self.accountant.max_lambda)
+        # really, this should be updated at every single point. However, it takes ages to run....
+        # self.accountant.log_moments_increment = self.generate_log_moments(N, self.accountant.max_lambda)
         for x in range(self.num_iterations):
-            if not self.account.should_stop:
+            if not self.accountant.should_stop:
                 _, c, c_kl, c_lik = sess.run(
                     [self.train_updates, self.energy_fn, self.kl_term, self.expected_lik],
                     feed_dict={self.xtrain: x_train, self.ytrain: y_train})
                 self.accountant.update_privacy_budget()
-            else:
-                print('Did not train model: privacy budget exceeded')
-        return np.array([c, c_kl, c_lik])
+
+        if not self.accountant.should_stop:
+            print("Privacy Cost: " + str(self.accountant.current_tracked_val))
+            return np.array([c, c_kl, c_lik])
 
     def get_weights(self):
         w_mean, w_log_var = self.sess.run([self.w_mean, self.w_log_var])
@@ -763,7 +764,7 @@ class LinReg_MFVI_DPSGD():
         post_mean = post_n1 / post_n2
         self.sess.run(
             [self.post_var_op, self.post_mean_op],
-            feed_dict={self.post_var_val: post_var,
+            feed_dict={self.post_var_val: np.log(post_var),
                        self.post_mean_val: post_mean})
         if update_prior:
             # compute and set prior

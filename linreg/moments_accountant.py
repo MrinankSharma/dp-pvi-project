@@ -79,10 +79,9 @@ class MomentsAccountant(object):
         eps = np.inf
         max_lambda = self.max_lambda
         for lambda_val in range(1, max_lambda + 1):
-            current_eps_bound = (1 / lambda_val) * (self.log_moments[lambda_val - 1] - np.log(delta))
+            current_eps_bound = (1.0 / lambda_val) * (self.log_moments[lambda_val - 1] - np.log(delta))
             # use the smallest upper bound for the tightest guarantee
             if current_eps_bound < eps:
                 eps = current_eps_bound
-
         self.tracked_val_history.append(eps)
         self.current_tracked_val = eps

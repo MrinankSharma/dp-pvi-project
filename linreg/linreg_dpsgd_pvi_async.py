@@ -9,9 +9,10 @@ import os
 import numpy as np
 
 import ray
-import linreg_models
-import data
+import linreg.linreg_models as linreg_models
+import linreg.data as data
 import tensorflow as tf
+from linreg.moments_accountant import MomentsAccountantPolicy, MomentsAccountant
 
 parser = argparse.ArgumentParser(description="asynchronous distributed variational training")
 parser.add_argument("--data", default='toy_1d', type=str,
@@ -56,23 +57,29 @@ def worker_task(ps, worker_index, no_workers, din, data_func,
 
     # get data for this worker
     x_train, y_train, _, _ = data_func(worker_index, no_workers, data_type)
+    n_train_master = x_train.shape[0]
 
     # Initialize the model
     n_train_worker = x_train.shape[0]
+    accountant = MomentsAccountant(MomentsAccountantPolicy.FIXED_DELTA_MAX_EPS, 1e-5, 20, 32)
     net = linreg_models.LinReg_MFVI_DPSGD(
-        din, n_train_worker, init_seed=seed,
+        din, n_train_worker, accountant, init_seed=seed,
         no_workers=no_workers)
+    accountant.log_moments_increment = net.generate_log_moments(n_train_master, 32)
     keys = net.get_params()[0]
 
     while True:
         # Get the current params from the parameter server.
         # print('get params from server and set...')
         params = ray.get(ps.pull.remote(keys))
-        net.set_params(keys, params)
+        # essential that update prior is false here!
+        net.set_params(keys, params, update_prior=False)
 
         # Compute an update and push it to the parameter server.
         # print('train the worker\'s local network')
-        net.train(x_train, y_train)
+        # only train if required
+        if not net.accountant.should_stop:
+            net.train(x_train, y_train)
 
         # todo: damping should relate to the number of workers
         # print('get local delta and push to server')
@@ -100,7 +107,9 @@ if __name__ == "__main__":
     x_train, y_train, x_test, y_test = data_func(0, 1)
     n_train_master = x_train.shape[0]
     in_dim = x_train.shape[1]
-    net = linreg_models.LinReg_MFVI_DPSGD(in_dim, n_train_master)
+    accountant = MomentsAccountant(MomentsAccountantPolicy.FIXED_DELTA_MAX_EPS, 1e-5, 20, 32)
+    net = linreg_models.LinReg_MFVI_DPSGD(in_dim, n_train_master, accountant)
+    accountant.log_moments_increment = net.generate_log_moments(n_train_master, 32)
     all_keys, all_values = net.get_params()
     ps = ParameterServer.remote(all_keys, all_values)
 
@@ -116,7 +125,10 @@ if __name__ == "__main__":
 
     if not os.path.exists(path):
         os.makedirs(path)
+
     i = 0
+    # wait some time to let the numerical integration complete
+    time.sleep(30)
     while i < no_intervals:
         current_params = ray.get(ps.pull.remote(all_keys))
         print(current_params)
