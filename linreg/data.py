@@ -3,8 +3,8 @@ import pdb
 
 def get_toy_1d():
     a = 2
-    # n_train = 10000
-    n_train = 1000
+    n_train = 10000
+    # n_train = 1000
     n_test = 2000
     xtrain = np.random.randn(n_train, 1)
     ytrain = a * xtrain + 0.5 * np.random.randn(n_train, 1)

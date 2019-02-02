@@ -13,6 +13,7 @@ int_type = tf.int32
 
 import mpmath as mp
 
+
 class LinReg_MFVI_analytic():
     """
     Stochastic global variational inference using Adam optimiser
@@ -587,9 +588,9 @@ class LinReg_MFVI_DPSGD():
 
     def __init__(self, din, n_train, accountant, noise_var=0.01,
                  prior_mean=0.0, prior_var=1.0,
-                 init_seed=0, no_workers=1, gradient_bound=1,
-                 learning_rate=1e-3, dpsgd_noise_scale=1, lot_size=50,
-                 num_iterations=100, single_thread=True):
+                 init_seed=0, no_workers=1, gradient_bound=10,
+                 learning_rate=1e-3, dpsgd_noise_scale=1, lot_size=2000,
+                 num_iterations=1000, single_thread=True):
         self.din = din
         # input and output placeholders
         self.xtrain = tf.placeholder(float_type, [None, din], 'input')
@@ -607,6 +608,7 @@ class LinReg_MFVI_DPSGD():
         self.dpsgd_noise_scale = dpsgd_noise_scale
         self.num_iterations = num_iterations
         self.lot_size = lot_size
+        self.gradient_bound = gradient_bound
 
         res = self._create_params(init_seed, prior_mean, prior_var)
         self.no_weights = res[0]
@@ -644,6 +646,11 @@ class LinReg_MFVI_DPSGD():
         self.params = TensorFlowVariablesWithScope(
             self.energy_fn, self.sess,
             scope='variational_nat', input_variables=[self.w_n1, self.w_n2])
+
+    def get_params_for_logging(self):
+        # we want to save the dpsgd parameters we are gonna use
+        learning_rate = self.sess.run(self.learning_rate)
+        return [self.gradient_bound, learning_rate, self.dpsgd_noise_scale, self.num_iterations, self.lot_size]
 
     def train(self, x_train, y_train):
         N = x_train.shape[0]
@@ -903,6 +910,7 @@ class LinReg_MFVI_DPSGD():
         c_t = self.gradient_bound
         grads = np.sqrt(np.square(mean_indiv_term) + np.square(var_indiv_term))
         factors = np.max(np.stack((grads / c_t, np.ones(grads.size))), axis=0)
+        factors = np.ones(grads.size)
         clipped_mean_grads = sum(mean_indiv_term / factors)
         clipped_var_grad = sum(var_indiv_term / factors)
         return clipped_mean_grads.astype(np.float32), clipped_var_grad.astype(np.float32)
@@ -952,6 +960,10 @@ class LinReg_MFVI_DPSGD():
         noisy_mean_term = tf.reshape(mean_term + tf.cast(noise[0], dtype=float_type), [1])
         # rescale as parameterised in terms of the log of the variance since the variance must remain positive
         noisy_log_var_term = tf.reshape(w_var * (var_term + tf.cast(noise[1], dtype=float_type)), [1])
+
+        noisy_mean_term = tf.reshape(mean_term + tf.cast(0, dtype=float_type), [1])
+        # rescale as parameterised in terms of the log of the variance since the variance must remain positive
+        noisy_log_var_term = tf.reshape(w_var * (var_term + tf.cast(0, dtype=float_type)), [1])
         return noisy_mean_term, noisy_log_var_term
 
     @staticmethod
@@ -984,7 +996,7 @@ class LinReg_MFVI_DPSGD():
         # placeholder for alpha_M(lambda) for each iteration
         alpha_M_lambda = np.zeros(max_lambda)
 
-        for lambda_val in range(1, max_lambda+1):
+        for lambda_val in range(1, max_lambda + 1):
             # it isn't defined which dataset is D and which is D' - thus consider both and take the maximum
             I1_func, I2_func = self.get_I1_I2_lambda(lambda_val, pdf1, pdf2)
             I1_val, _ = mp.quad(I1_func, [-mp.inf, mp.inf], error=True)
@@ -1015,9 +1027,9 @@ class LinReg_MFVI_DPSGD():
         epsilons = np.zeros(total_evals)
 
         # convert to deltas given fixed epsilon for each iteration
-        for i in range(1, total_evals+1):
+        for i in range(1, total_evals + 1):
             eps = np.inf
-            for lambda_val in range(1, max_lambda+1):
+            for lambda_val in range(1, max_lambda + 1):
                 current_eps_bound = (1 / lambda_val) * ((i * log_moments[lambda_val - 1]) - np.log(delta))
                 # use the smallest upper bound for the tightest guarantee
                 if current_eps_bound < eps:
@@ -1025,7 +1037,7 @@ class LinReg_MFVI_DPSGD():
             # store running track...
             epsilons[i - 1] = eps
 
-        epoch_sf = self.lot_size/N
+        epoch_sf = self.lot_size / N
 
         return epsilons[-1], epsilons, total_evals, epoch_sf
 
@@ -1036,9 +1048,9 @@ class LinReg_MFVI_DPSGD():
         total_evals = num_iterations * num_intervals
         epsilons = np.zeros(total_evals)
 
-        delta_prime = 0.1*delta
+        delta_prime = 0.1 * delta
 
-        for k in range(1, total_evals+1):
+        for k in range(1, total_evals + 1):
             amp_delta_i = (delta - delta_prime) / k
             delta_i = amp_delta_i / q
 
@@ -1052,7 +1064,6 @@ class LinReg_MFVI_DPSGD():
 
             # compose back
             eps_tot = (np.sqrt(2 * k * np.log(1 / delta_prime)) * eps_i) + (k * eps_i * (np.exp(eps_i) - 1))
-            epsilons[k-1] = eps_tot
+            epsilons[k - 1] = eps_tot
 
         return epsilons[-1], epsilons, total_evals, q
-
