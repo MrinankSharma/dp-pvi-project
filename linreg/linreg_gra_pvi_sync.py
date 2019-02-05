@@ -117,8 +117,8 @@ if __name__ == "__main__":
     i = 0
     current_params = ray.get(ps.pull.remote(all_keys))
 
-    path_prefix = '/tmp/distributed_training/'
-    path = path_prefix + 'pvi_sync_%s_data_%s_seed_%d_no_workers_%d_damping_%.3f/' % (
+    path_prefix = 'logs/distributed_training/'
+    path = path_prefix + 'gra_pvi_sync_%s_data_%s_seed_%d_no_workers_%d_damping_%.3f/' % (
         dataset, data_type, seed, no_workers, damping)
     if not os.path.exists(path):
         os.makedirs(path)
@@ -128,6 +128,10 @@ if __name__ == "__main__":
     time_fname = path + 'train_time.txt'
     time_file = open(time_fname, 'w', 0)
     time_file.write('%.4f\n' % 0)
+
+    tracker_file = "logs/gra_indiv_terms.txt"
+    if os.path.exists(tracker_file):
+        os.remove(tracker_file)
 
     while i < no_intervals:
         start_time = time.time()
