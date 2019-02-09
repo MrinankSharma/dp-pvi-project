@@ -13,6 +13,7 @@ import linreg.linreg_models as linreg_models
 import linreg.data as data
 import tensorflow as tf
 from linreg.moments_accountant import MomentsAccountantPolicy, MomentsAccountant
+from linreg.plot_predictive import save_predictive_plot
 
 parser = argparse.ArgumentParser(description="synchronous distributed variational training.")
 parser.add_argument("--data", default='toy_1d', type=str,
@@ -58,11 +59,12 @@ class Worker(object):
         # Initialize the model
         n_train_worker = x_train.shape[0]
         self.n_train = n_train_worker
-        self.accountant = MomentsAccountant(MomentsAccountantPolicy.FIXED_DELTA_MAX_EPS, 1e-5, 20, 32)
+        self.accountant = MomentsAccountant(MomentsAccountantPolicy.FIXED_DELTA, 1e-5, 2000000, 32)
         self.net = linreg_models.LinReg_MFVI_DPSGD(
             din, n_train_worker, self.accountant, init_seed=seed,
             no_workers=no_workers)
-        self.accountant.log_moments_increment = self.net.generate_log_moments(n_train_master, 32)
+        # self.accountant.log_moments_increment = self.net.generate_log_moments(n_train_master, 32)
+        self.accountant.log_moments_increment = np.ones(32);
         self.keys = self.net.get_params()[0]
         np.savetxt(log_path+"data/worker_{}_x.txt".format(worker_index), self.x_train)
         np.savetxt(log_path + "data/worker_{}_y.txt".format(worker_index), self.y_train)
@@ -74,6 +76,7 @@ class Worker(object):
         self.net.train(self.x_train, self.y_train)
         # get local delta and push to server
         delta = self.net.get_param_diff(damping=damping)
+
         return delta
 
 def compute_update(keys, deltas, method='sum'):
@@ -111,7 +114,7 @@ if __name__ == "__main__":
     x_train, y_train, x_test, y_test = data_func(0, 1)
     n_train_master = x_train.shape[0]
     in_dim = x_train.shape[1]
-    accountant = MomentsAccountant(MomentsAccountantPolicy.FIXED_DELTA, 1e-5, 20, 32)
+    accountant = MomentsAccountant(MomentsAccountantPolicy.FIXED_DELTA, 1e-5, 20000000, 32)
     net = linreg_models.LinReg_MFVI_DPSGD(in_dim, n_train_master, accountant)
     accountant.log_moments_increment = np.ones(32);
     # accountant.log_moments_increment = net.generate_log_moments(n_train_master, 32)
@@ -129,22 +132,15 @@ if __name__ == "__main__":
     i = 0
     current_params = ray.get(ps.pull.remote(all_keys))
 
-    # path = path_prefix + 'dpsgd_pvi_sync_%s_data_%s_seed_%d_no_workers_%d_damping_%.3f/' % (
-    #     dataset, data_type, seed, no_workers, damping)
-
     if not os.path.exists(path):
         os.makedirs(path)
-    # np.savez_compressed(
-    #     path + 'params_interval_%d.npz' % i,
-    #     n1=current_params[0], n2=current_params[1])
-    # time_fname = path + 'train_time.txt'
-    # time_file = open(time_fname, 'w', 0)
-    # time_file.write('%.4f\n' % 0)
 
-    N_train_worker = data_func(1, no_workers)[0].shape[0]
-    names=["c", "learning_rate", "noise_scale", "num_iterations", "L", "N_train_worker"]
+    N_train_worker = data_func(0, no_workers)[0].shape[0]
+    print("N Train Worker: {}".format(N_train_worker))
+    names=["c", "learning_rate_mean", "learning_rate_var", "noise_scale", "num_iterations", "L", "N_train_worker", "Num_workers"]
     params_save = net.get_params_for_logging()
     params_save.append(N_train_worker)
+    params_save.append(no_workers)
     param_file = path + 'settings.txt'
     text_file = open(param_file, "w")
     text_file.write('DPSGD Parameters\n')
@@ -170,5 +166,11 @@ if __name__ == "__main__":
         # save to file, tracking stuff
         with open(tracker_file, 'a') as file:
             file.write("{} {}\n".format(current_params[0], current_params[1]))
+
+    meanpres = current_params[0]
+    pres = current_params[1]
+    var = 1/pres
+    mean = meanpres / pres
+    save_predictive_plot(path+'pred.png', x_train, y_train, mean, var, 1)
 
 

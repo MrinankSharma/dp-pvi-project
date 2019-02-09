@@ -21,7 +21,7 @@ class LinReg_MFVI_analytic():
     variational parameters: mu and log(var)
     """
 
-    def __init__(self, din, n_train, noise_var=0.01,
+    def __init__(self, din, n_train, noise_var=0.25,
                  prior_mean=0.0, prior_var=1.0,
                  init_seed=0, no_workers=1,
                  single_thread=True):
@@ -291,7 +291,7 @@ class LinReg_MFVI_GRA():
     variational parameters: mu and log(var)
     """
 
-    def __init__(self, din, n_train, noise_var=0.01,
+    def __init__(self, din, n_train, noise_var=0.25,
                  prior_mean=0.0, prior_var=1,
                  init_seed=0, no_workers=1,
                  single_thread=True):
@@ -341,8 +341,8 @@ class LinReg_MFVI_GRA():
     def train(self, x_train, y_train):
         N = x_train.shape[0]
         sess = self.sess
-        tracker_file="logs/gra_indiv_terms.txt"
-        for x in range(2000000):
+        tracker_file = "logs/gra_indiv_terms.txt"
+        for x in range(1000000):
             a, c, c_kl, c_lik = sess.run(
                 [self.train_updates, self.energy_fn, self.kl_term, self.expected_lik],
                 feed_dict={self.xtrain: x_train, self.ytrain: y_train})
@@ -350,7 +350,8 @@ class LinReg_MFVI_GRA():
             tracking_grads = a[2:]
             with open(tracker_file, 'a') as file:
                 tracking_grads = tracking_grads[0]
-                file.write("{} {} {} {}\n".format(np.asscalar(tracking_grads[0]), np.asscalar(tracking_grads[1]), np.asscalar(tracking_grads[2]), np.asscalar(tracking_grads[3])))
+                file.write("{} {} {} {}\n".format(np.asscalar(tracking_grads[0]), np.asscalar(tracking_grads[1]),
+                                                  np.asscalar(tracking_grads[2]), np.asscalar(tracking_grads[3])))
 
         return np.array([c, c_kl, c_lik])
 
@@ -557,8 +558,8 @@ class LinReg_MFVI_GRA():
         # perform incredibly simple gradient ascent - we are trying to maximise the free energy
         learning_rate = tf.constant([0.000001])
         update_m = self.w_mean.assign_add(learning_rate * mean_grad)
-        update_v = self.w_log_var.assign_add(learning_rate * log_var_grad)
-        return update_m, update_v, tracking_terms, tf.print(self.w_mean, tf.exp(self.w_log_var))
+        update_v = self.w_log_var.assign_add(learning_rate * 10.85 * log_var_grad)
+        return update_m, update_v, tracking_terms, tf.print(1 / tf.exp(self.w_log_var))
 
     def build_gradient(self):
         # build the gradient of the free energy over all datapoints
@@ -579,7 +580,7 @@ class LinReg_MFVI_GRA():
         non_data_mean_term = entropy_mean_term + prior_mean_term
         non_data_var_term = entropy_var_term + prior_var_term
 
-        tracking_terms = [non_data_mean_term, w_var * non_data_var_term, lik_mean_term, w_var*lik_var_term]
+        tracking_terms = [non_data_mean_term, w_var * non_data_var_term, lik_mean_term, w_var * lik_var_term]
 
         # sum and reshape into vectors
         mean_term = tf.reshape(entropy_mean_term + lik_mean_term + prior_mean_term, [1])
@@ -595,11 +596,11 @@ class LinReg_MFVI_DPSGD():
     variational parameters: mu and log(var)
     """
 
-    def __init__(self, din, n_train, accountant, noise_var=0.01,
+    def __init__(self, din, n_train, accountant, noise_var=1,
                  prior_mean=0.0, prior_var=1,
-                 init_seed=0, no_workers=1, gradient_bound=10000,
-                 learning_rate=1e-3, dpsgd_noise_scale=0.01, lot_size=200,
-                 num_iterations=100, single_thread=True):
+                 init_seed=0, no_workers=1, gradient_bound=1e20,
+                 learning_rate_mean=1e-6, learning_rate_var=1e-3, dpsgd_noise_scale=1e-12, lot_size=1000,
+                 num_iterations=10000, single_thread=True):
         self.din = din
         # input and output placeholders
         self.xtrain = tf.placeholder(float_type, [None, din], 'input')
@@ -613,7 +614,8 @@ class LinReg_MFVI_DPSGD():
 
         # DP-SGD Parameters
         self.gradient_bound = gradient_bound
-        self.learning_rate = tf.constant(learning_rate, dtype=float_type)
+        self.learning_rate_mean = tf.constant(learning_rate_mean, dtype=float_type)
+        self.learning_rate_var = tf.constant(learning_rate_var, dtype=float_type)
         self.dpsgd_noise_scale = dpsgd_noise_scale
         self.num_iterations = num_iterations
         self.lot_size = lot_size
@@ -626,12 +628,11 @@ class LinReg_MFVI_DPSGD():
         self.prior_mean, self.prior_var = res[5], res[6]
         self.local_n1, self.local_n2 = res[7], res[8]
 
-        noise_var = dpsgd_noise_scale * dpsgd_noise_scale * gradient_bound * gradient_bound
+        noise_var_dpsgd = dpsgd_noise_scale * dpsgd_noise_scale * gradient_bound * gradient_bound
         # create noise distribution for convience
         # multiple dimension by 2 since there is a mean and variance for each dimension
         self.noise_dist = tfp.distributions.MultivariateNormalDiag(loc=np.zeros(2 * din),
-                                                                   scale_diag=dpsgd_noise_scale * np.ones(2 * din))
-
+                                                                   scale_diag=noise_var_dpsgd * np.ones(2 * din))
         # create helper assignment ops
         self._create_assignment_ops()
 
@@ -658,8 +659,9 @@ class LinReg_MFVI_DPSGD():
 
     def get_params_for_logging(self):
         # we want to save the dpsgd parameters we are gonna use
-        learning_rate = self.sess.run(self.learning_rate)
-        return [self.gradient_bound, learning_rate, self.dpsgd_noise_scale, self.num_iterations, self.lot_size]
+        learning_rate_mean, learning_rate_var = self.sess.run([self.learning_rate_mean, self.learning_rate_var])
+        return [self.gradient_bound, learning_rate_mean, learning_rate_var,
+                self.dpsgd_noise_scale, self.num_iterations, self.lot_size]
 
     def train(self, x_train, y_train):
         N = x_train.shape[0]
@@ -668,6 +670,7 @@ class LinReg_MFVI_DPSGD():
         # self.accountant.log_moments_increment = self.generate_log_moments(N, self.accountant.max_lambda)
         for x in range(self.num_iterations):
             if not self.accountant.should_stop:
+                # print("Local Iteration {}".format(x))
                 _, c, c_kl, c_lik = sess.run(
                     [self.train_updates, self.energy_fn, self.kl_term, self.expected_lik],
                     feed_dict={self.xtrain: x_train, self.ytrain: y_train})
@@ -879,8 +882,8 @@ class LinReg_MFVI_DPSGD():
         # mean_grad, log_var_grad = self.build_gradient()
         # perform incredibly simple gradient ascent - we are trying to maximise the free energy
         mean_noisy_grad, noisy_log_var_grad = self.build_noisy_partial_gradient()
-        update_m = self.w_mean.assign_add(self.learning_rate * mean_noisy_grad)
-        update_lv = self.w_log_var.assign_add(self.learning_rate * noisy_log_var_grad)
+        update_m = self.w_mean.assign_add(self.learning_rate_mean * mean_noisy_grad)
+        update_lv = self.w_log_var.assign_add(self.learning_rate_var * noisy_log_var_grad)
         # approximately true optimal parameters - to check if gradient is small enough
         # update_m = self.w_mean.assign([2])
         # update_lv = self.w_log_var.assign([tf.log(1/95000)])
@@ -919,10 +922,10 @@ class LinReg_MFVI_DPSGD():
         c_t = self.gradient_bound
         grads = np.sqrt(np.square(mean_indiv_term) + np.square(var_indiv_term))
         factors = np.max(np.stack((grads / c_t, np.ones(grads.size))), axis=0)
-        factors = np.ones(grads.size)
+        # factors = np.ones(mean_indiv_term.size)
         clipped_mean_grads = sum(mean_indiv_term / factors)
         clipped_var_grad = sum(var_indiv_term / factors)
-        return clipped_mean_grads.astype(np.float32), clipped_var_grad.astype(np.float32)
+        return sum(mean_indiv_term).astype(np.float32), sum(var_indiv_term).astype(np.float32)
 
     def build_noisy_partial_gradient(self):
         # build gradient of the free energy over a lot_size datapoints for stochastic
@@ -947,12 +950,13 @@ class LinReg_MFVI_DPSGD():
         w_var = tf.exp(self.w_log_var)
         prior_var = self.prior_var
 
+        # ensure it is float 32
+        prefactor = tf.cast(1 / N, dtype=float_type)
+
         # these are now individual terms
         lik_mean_term_i = (-0.5 / (self.noise_var)) * (2 * self.w_mean * xTx_i - 2 * xTy_i)
         lik_var_term_i = (-0.5 / self.noise_var) * xTx_i
 
-        # ensure it is float 32
-        prefactor = tf.cast(1 / N, dtype=float_type)
         # these terms needs to be rescaling by 1/N (summed later on)
         entropy_mean_term = 0
         entropy_var_term = prefactor * 1 / (2 * w_var)
@@ -969,6 +973,10 @@ class LinReg_MFVI_DPSGD():
         noisy_mean_term = tf.reshape(mean_term + tf.cast(noise[0], dtype=float_type), [1])
         # rescale as parameterised in terms of the log of the variance since the variance must remain positive
         noisy_log_var_term = tf.reshape(w_var * (var_term + tf.cast(noise[1], dtype=float_type)), [1])
+
+        noisy_mean_term = tf.reshape(mean_term + tf.cast(0, dtype=float_type), [1])
+        # rescale as parameterised in terms of the log of the variance since the variance must remain positive
+        noisy_log_var_term = tf.reshape(w_var * (var_term + tf.cast(0, dtype=float_type)), [1])
         return noisy_mean_term, noisy_log_var_term
 
     @staticmethod
