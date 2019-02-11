@@ -628,6 +628,8 @@ class LinReg_MFVI_DPSGD():
         self.prior_mean, self.prior_var = res[5], res[6]
         self.local_n1, self.local_n2 = res[7], res[8]
 
+        self.prior_var_num = prior_var
+
         noise_var_dpsgd = dpsgd_noise_scale * dpsgd_noise_scale * gradient_bound * gradient_bound
         # create noise distribution for convience
         # multiple dimension by 2 since there is a mean and variance for each dimension
@@ -925,7 +927,7 @@ class LinReg_MFVI_DPSGD():
         # factors = np.ones(mean_indiv_term.size)
         clipped_mean_grads = sum(mean_indiv_term / factors)
         clipped_var_grad = sum(var_indiv_term / factors)
-        return clipped_mean_grads, clipped_var_grad
+        return clipped_mean_grads.astype(np.float32), clipped_var_grad.astype(np.float32)
 
     def build_noisy_partial_gradient(self):
         # build gradient of the free energy over a lot_size datapoints for stochastic

@@ -20,7 +20,7 @@ def exact_inference(x_train, y_train, prior_var, noise_var):
     xtx = np.einsum('na, na->a', x_train, x_train)
     xty = np.einsum('na, n->a', x_train, y_train)
     post_var = 1/(noise_var**-1 * xtx + prior_var**-1)
-    post_mean = post_mean * (noise_var**-1)*xty
+    post_mean = post_var * (noise_var**-1)*xty
     post_pres = 1/post_var
     return post_mean, post_var, post_mean*post_pres, post_pres
 

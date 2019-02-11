@@ -125,10 +125,12 @@ if __name__ == "__main__":
     x_train, y_train, x_test, y_test = data_func(0, 1)
     n_train_master = x_train.shape[0]
 
-
     in_dim = x_train.shape[1]
     accountant = MomentsAccountant(MomentsAccountantPolicy.FIXED_DELTA, 1e-5, 200, 32)
     net = linreg_models.LinReg_MFVI_DPSGD(in_dim, n_train_master, accountant, noise_var=noise_var)
+
+    # _, _, a, b = exact_inference(x_train, y_train, net.prior_var_num, noise_std**2)
+    # print("Exact Inference: {}, {}".format(a, b))
     accountant.log_moments_increment = np.ones(32);
     # accountant.log_moments_increment = net.generate_log_moments(n_train_master, 32)
     all_keys, all_values = net.get_params()
