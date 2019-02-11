@@ -21,7 +21,7 @@ class LinReg_MFVI_analytic():
     variational parameters: mu and log(var)
     """
 
-    def __init__(self, din, n_train, noise_var=0.25,
+    def __init__(self, din, n_train, noise_var=1,
                  prior_mean=0.0, prior_var=1.0,
                  init_seed=0, no_workers=1,
                  single_thread=True):
@@ -925,7 +925,7 @@ class LinReg_MFVI_DPSGD():
         # factors = np.ones(mean_indiv_term.size)
         clipped_mean_grads = sum(mean_indiv_term / factors)
         clipped_var_grad = sum(var_indiv_term / factors)
-        return sum(mean_indiv_term).astype(np.float32), sum(var_indiv_term).astype(np.float32)
+        return clipped_mean_grads, clipped_var_grad
 
     def build_noisy_partial_gradient(self):
         # build gradient of the free energy over a lot_size datapoints for stochastic

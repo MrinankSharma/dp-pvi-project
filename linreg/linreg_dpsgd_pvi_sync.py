@@ -30,6 +30,11 @@ parser.add_argument("--damping", default=0.0, type=float,
                     help="damping rate, new = damping * old + (1-damping) * new.")
 parser.add_argument("--redis-address", default=None, type=str,
                     help="The Redis address of the cluster.")
+parser.add_argument("--mean", default=2, type=float,
+                    help="Linear Regression Slope")
+parser.add_argument("--noise-std", default=1, type=float,
+                    help="Noise Standard Deviation")
+
 
 @ray.remote
 class ParameterServer(object):
@@ -46,27 +51,27 @@ class ParameterServer(object):
     def pull(self, keys):
         return [self.params[key] for key in keys]
 
+
 @ray.remote
 class Worker(object):
     def __init__(
-            self, worker_index, no_workers, din, data_func, log_path,
-            data_type='homous', seed=0):
+            self, worker_index, no_workers, din, data_func, log_path, noise_var=1, seed=0):
         np.random.seed(seed)
         tf.set_random_seed(seed)
         # get data for this worker
         self.x_train, self.y_train, _, _ = data_func(
-            worker_index, no_workers, data_type)
+            worker_index, no_workers)
         # Initialize the model
         n_train_worker = x_train.shape[0]
         self.n_train = n_train_worker
         self.accountant = MomentsAccountant(MomentsAccountantPolicy.FIXED_DELTA, 1e-5, 2000000, 32)
         self.net = linreg_models.LinReg_MFVI_DPSGD(
-            din, n_train_worker, self.accountant, init_seed=seed,
+            din, n_train_worker, self.accountant, noise_var=noise_var, init_seed=seed,
             no_workers=no_workers)
         # self.accountant.log_moments_increment = self.net.generate_log_moments(n_train_master, 32)
         self.accountant.log_moments_increment = np.ones(32);
         self.keys = self.net.get_params()[0]
-        np.savetxt(log_path+"data/worker_{}_x.txt".format(worker_index), self.x_train)
+        np.savetxt(log_path + "data/worker_{}_x.txt".format(worker_index), self.x_train)
         np.savetxt(log_path + "data/worker_{}_y.txt".format(worker_index), self.y_train)
 
     def get_delta(self, params, damping=0.5):
@@ -78,6 +83,7 @@ class Worker(object):
         delta = self.net.get_param_diff(damping=damping)
 
         return delta
+
 
 def compute_update(keys, deltas, method='sum'):
     mean_delta = []
@@ -94,6 +100,7 @@ def compute_update(keys, deltas, method='sum'):
             mean_delta.append(sum_delta / no_deltas)
     return mean_delta
 
+
 if __name__ == "__main__":
     args = parser.parse_args()
     ray.init(redis_address=args.redis_address, redirect_worker_output=False, redirect_output=False)
@@ -103,19 +110,23 @@ if __name__ == "__main__":
     no_intervals = args.no_intervals
     no_workers = args.num_workers
     dataset = args.data
+    noise_std = args.noise_std
+    mean = args.mean
+
+    noise_var = np.square(noise_std)
 
     np.random.seed(seed)
     tf.set_random_seed(seed)
 
     if dataset == 'toy_1d':
-        data_func = data.get_toy_1d_shard
+        data_func = lambda idx, N: data.get_toy_1d_shard(idx, N, data_type, mean, noise_std)
 
     # Create a parameter server with some random params.
     x_train, y_train, x_test, y_test = data_func(0, 1)
     n_train_master = x_train.shape[0]
     in_dim = x_train.shape[1]
-    accountant = MomentsAccountant(MomentsAccountantPolicy.FIXED_DELTA, 1e-5, 20000000, 32)
-    net = linreg_models.LinReg_MFVI_DPSGD(in_dim, n_train_master, accountant)
+    accountant = MomentsAccountant(MomentsAccountantPolicy.FIXED_DELTA, 1e-5, 200, 32)
+    net = linreg_models.LinReg_MFVI_DPSGD(in_dim, n_train_master, accountant, noise_var=noise_var)
     accountant.log_moments_increment = np.ones(32);
     # accountant.log_moments_increment = net.generate_log_moments(n_train_master, 32)
     all_keys, all_values = net.get_params()
@@ -123,11 +134,10 @@ if __name__ == "__main__":
 
     timestr = time.strftime("%m-%d;%H:%M:%S")
     path = 'logs/dpsgd_sync_pvi/' + timestr + '/'
-    os.makedirs(path+"data/")
+    os.makedirs(path + "data/")
     # create workers
     workers = [
-        Worker.remote(i, no_workers, in_dim, data_func, path,
-            data_type=data_type, seed=seed) 
+        Worker.remote(i, no_workers, in_dim, data_func, path, noise_var, seed=seed)
         for i in range(no_workers)]
     i = 0
     current_params = ray.get(ps.pull.remote(all_keys))
@@ -136,11 +146,14 @@ if __name__ == "__main__":
         os.makedirs(path)
 
     N_train_worker = data_func(0, no_workers)[0].shape[0]
-    print("N Train Worker: {}".format(N_train_worker))
-    names=["c", "learning_rate_mean", "learning_rate_var", "noise_scale", "num_iterations", "L", "N_train_worker", "Num_workers"]
+    # print("N Train Worker: {}".format(N_train_worker))
+    names = ["c", "learning_rate_mean", "learning_rate_var", "noise_scale", "num_iterations", "L", "N_train_worker",
+             "Num_workers", "mean", "noise_var"]
     params_save = net.get_params_for_logging()
     params_save.append(N_train_worker)
     params_save.append(no_workers)
+    params_save.append(mean)
+    params_save.append(noise_var)
     param_file = path + 'settings.txt'
     text_file = open(param_file, "w")
     text_file.write('DPSGD Parameters\n')
@@ -169,8 +182,6 @@ if __name__ == "__main__":
 
     meanpres = current_params[0]
     pres = current_params[1]
-    var = 1/pres
+    var = 1 / pres
     mean = meanpres / pres
-    save_predictive_plot(path+'pred.png', x_train, y_train, mean, var, 1)
-
-
+    save_predictive_plot(path + 'pred.png', x_train, y_train, mean, var, 1)

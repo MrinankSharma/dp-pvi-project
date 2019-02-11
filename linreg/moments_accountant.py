@@ -57,7 +57,6 @@ class MomentsAccountant(object):
             # need the algorithm to stop
             self.should_stop = True
 
-        return False
         return self.should_stop
 
 
