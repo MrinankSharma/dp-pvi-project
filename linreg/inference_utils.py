@@ -15,3 +15,12 @@ def save_predictive_plot(filepath, x_train, y_train, pred_mean, pred_var, noise_
     plt.fill_between(grid_vals, upper_pred, lower_pred, alpha=0.5)
     plt.savefig(filepath)
 
+def exact_inference(x_train, y_train, prior_var, noise_var):
+    # prior is assumed to be zero mean
+    xtx = np.einsum('na, na->a', x_train, x_train)
+    xty = np.einsum('na, n->a', x_train, y_train)
+    post_var = 1/(noise_var**-1 * xtx + prior_var**-1)
+    post_mean = post_mean * (noise_var**-1)*xty
+    post_pres = 1/post_var
+    return post_mean, post_var, post_mean*post_pres, post_pres
+

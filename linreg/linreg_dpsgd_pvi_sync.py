@@ -13,7 +13,7 @@ import linreg.linreg_models as linreg_models
 import linreg.data as data
 import tensorflow as tf
 from linreg.moments_accountant import MomentsAccountantPolicy, MomentsAccountant
-from linreg.plot_predictive import save_predictive_plot
+from linreg.inference_utils import save_predictive_plot, exact_inference
 
 parser = argparse.ArgumentParser(description="synchronous distributed variational training.")
 parser.add_argument("--data", default='toy_1d', type=str,
@@ -124,6 +124,8 @@ if __name__ == "__main__":
     # Create a parameter server with some random params.
     x_train, y_train, x_test, y_test = data_func(0, 1)
     n_train_master = x_train.shape[0]
+
+
     in_dim = x_train.shape[1]
     accountant = MomentsAccountant(MomentsAccountantPolicy.FIXED_DELTA, 1e-5, 200, 32)
     net = linreg_models.LinReg_MFVI_DPSGD(in_dim, n_train_master, accountant, noise_var=noise_var)
