@@ -6,7 +6,7 @@ import tensorflow as tf
 import tensorflow_probability as tfp
 import numpy as np
 import math
-from tfutils import TensorFlowVariablesWithScope
+from linreg.tfutils import TensorFlowVariablesWithScope
 
 float_type = tf.float32
 int_type = tf.int32

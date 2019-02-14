@@ -68,8 +68,8 @@ class Worker(object):
         self.net = linreg_models.LinReg_MFVI_DPSGD(
             din, n_train_worker, self.accountant, noise_var=noise_var, init_seed=seed,
             no_workers=no_workers)
-        # self.accountant.log_moments_increment = self.net.generate_log_moments(n_train_master, 32)
-        self.accountant.log_moments_increment = np.ones(32);
+        # self.accountant.log_moments_increment = np.ones(32);
+        self.accountant.log_moments_increment = self.net.generate_log_moments(n_train_master, 32)
         self.keys = self.net.get_params()[0]
         np.savetxt(log_path + "data/worker_{}_x.txt".format(worker_index), self.x_train)
         np.savetxt(log_path + "data/worker_{}_y.txt".format(worker_index), self.y_train)
@@ -84,6 +84,8 @@ class Worker(object):
 
         return delta
 
+    def get_privacy_spent(self):
+        return self.accountant.current_tracked_val
 
 def compute_update(keys, deltas, method='sum'):
     mean_delta = []
@@ -129,8 +131,10 @@ if __name__ == "__main__":
     accountant = MomentsAccountant(MomentsAccountantPolicy.FIXED_DELTA, 1e-5, 200, 32)
     net = linreg_models.LinReg_MFVI_DPSGD(in_dim, n_train_master, accountant, noise_var=noise_var)
 
-    # _, _, a, b = exact_inference(x_train, y_train, net.prior_var_num, noise_std**2)
-    # print("Exact Inference: {}, {}".format(a, b))
+    _, _, exact_mean_pres, exact_pres = exact_inference(x_train, y_train, net.prior_var_num, noise_std**2)
+    print("Exact Inference Params: {}, {}".format(exact_mean_pres, exact_pres))
+
+    # accountant is not important here...
     accountant.log_moments_increment = np.ones(32);
     # accountant.log_moments_increment = net.generate_log_moments(n_train_master, 32)
     all_keys, all_values = net.get_params()
@@ -163,6 +167,8 @@ if __name__ == "__main__":
     text_file.write('DPSGD Parameters\n')
     for i in range(len(names)):
         text_file.write('{} : {:.2e} \n'.format(names[i], params_save[i]))
+    text_file.write('Exact Inference (Non-PVI)\n')
+    text_file.write("Params: {}, {}".format(exact_mean_pres, exact_pres))
     text_file.close()
 
     tracker_file = path + 'params.txt'
@@ -188,4 +194,11 @@ if __name__ == "__main__":
     pres = current_params[1]
     var = 1 / pres
     mean = meanpres / pres
-    save_predictive_plot(path + 'pred.png', x_train, y_train, mean, var, 1)
+    eps = workers[0].get_privacy_spent.remote()
+    eps = ray.get(eps)
+    plot_title = "({:.3e}, {:.3e})-DP".format(eps, 1e-5)
+
+    save_predictive_plot(path + 'pred.png', x_train, y_train, mean, var, noise_var, plot_title)
+    # report the privacy cost and plot onto the graph...
+    print(plot_title)
+
