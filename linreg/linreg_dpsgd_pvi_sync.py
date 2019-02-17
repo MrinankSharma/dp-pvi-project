@@ -7,6 +7,7 @@ import time
 import pdb
 import numpy as np
 import os
+import json
 
 import ray
 import linreg.linreg_models as linreg_models
@@ -114,6 +115,14 @@ if __name__ == "__main__":
     dataset = args.data
     noise_std = args.noise_std
     mean = args.mean
+    # param_file = args.param_file
+    #
+    # with open(param_file) as f:
+    #     dpsgd_params = json.load(f)['dpsgd_params']
+    #
+    # dpsgd_C = dpsgd_params['C']
+    # dpsgd_L = dpsgd_params['L']
+    # dpsgd_sigma = dpsgd_params['sigma']
 
     noise_var = np.square(noise_std)
 
