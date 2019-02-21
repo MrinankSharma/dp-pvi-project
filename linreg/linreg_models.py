@@ -34,6 +34,7 @@ class LinReg_MFVI_analytic():
         self.n_train = n_train
         self.no_workers = no_workers
         self.noise_var = noise_var
+        self.prior_var_num = prior_var
 
         # create parameters for the model
         #  [no_params, w_mean, w_var, w_n1, w_n2,
@@ -1405,4 +1406,4 @@ class LinReg_MFVI_DP_analytic():
 
     def generate_log_moments(self, N, max_lambda):
         return generate_log_moments(N, max_lambda, self.dp_noise_scale, self.lot_size)
-        
+

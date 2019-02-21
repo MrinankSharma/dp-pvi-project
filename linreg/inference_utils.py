@@ -25,3 +25,12 @@ def exact_inference(x_train, y_train, prior_var, noise_var):
     post_pres = 1/post_var
     return post_mean, post_var, post_mean*post_pres, post_pres
 
+def KL_Gaussians(nat11, nat12, nat21, nat22):
+    v1 = 1/nat12
+    v2 = 1/nat22
+    m1 = nat11/nat12
+    m2 = nat21/nat22
+    KL = np.log(np.sqrt(v2/v1)) + (v1 + (m1-m2)**2)/(2*v2)
+    return KL
+
+

@@ -12,7 +12,8 @@ import linreg.linreg_models as linreg_models
 import linreg.data as data
 import tensorflow as tf
 from linreg.moments_accountant import MomentsAccountantPolicy, MomentsAccountant
-from linreg.inference_utils import save_predictive_plot, exact_inference
+from linreg.inference_utils import save_predictive_plot, exact_inference, KL_Gaussians
+from linreg.log_moment_utils import generate_log_moments
 
 parser = argparse.ArgumentParser(description="synchronous distributed variational training.")
 parser.add_argument("--data", default='toy_1d', type=str,
@@ -33,6 +34,10 @@ parser.add_argument("--mean", default=2, type=float,
                     help="Linear Regression Slope")
 parser.add_argument("--noise-std", default=1, type=float,
                     help="Noise Standard Deviation")
+parser.add_argument("--dp-noise-scale", default=1, type=float,
+                    help="DP Noise")
+parser.add_argument("--clipping-bound", default=1, type=float,
+                    help="DP clipping")
 
 
 @ray.remote
@@ -61,14 +66,12 @@ class Worker(object):
         self.x_train, self.y_train, _, _ = data_func(
             worker_index, no_workers)
         # Initialize the model
-        n_train_worker = x_train.shape[0]
+        n_train_worker = self.x_train.shape[0]
         self.n_train = n_train_worker
-        self.accountant = MomentsAccountant(MomentsAccountantPolicy.FIXED_DELTA, 1e-5, 2000000, 32)
-        self.net = linreg_models.LinReg_MFVI_DP_analytic(
-            din, n_train_worker, self.accountant, noise_var=noise_var, init_seed=seed,
+        self.net = linreg_models.LinReg_MFVI_analytic(
+            din, n_train_worker, noise_var=noise_var, init_seed=seed,
             no_workers=no_workers)
-        # self.accountant.log_moments_increment = np.ones(32);
-        self.accountant.log_moments_increment = self.net.generate_log_moments(n_train_master, 32)
+
         self.keys = self.net.get_params()[0]
         np.savetxt(log_path + "data/worker_{}_x.txt".format(worker_index), self.x_train)
         np.savetxt(log_path + "data/worker_{}_y.txt".format(worker_index), self.y_train)
@@ -83,20 +86,35 @@ class Worker(object):
 
         return delta
 
-    def get_privacy_spent(self):
-        return self.accountant.current_tracked_val
+
+def add_noise_clip_delta(deltas, clipping_bound, noise_scale):
+    no_delta = len(deltas)
+    new_deltas = []
+    for i in range(no_delta):
+        norm = (deltas[i][0] ** 2 + deltas[i][1] ** 2) ** 0.5
+        if clipping_bound < norm:
+            scaling = clipping_bound / norm
+        else:
+            scaling = 1
+        new_delta = [deltas[i][0] * scaling, deltas[i][1] * scaling]
+        new_deltas.append(new_delta)
+    noise = np.random.normal(0, noise_scale * clipping_bound, [2])
+    # include the noise as part of the deltas
+    new_deltas[0][0] = new_deltas[0][0] + noise[0]
+    new_deltas[0][1] = new_deltas[0][1] + noise[1]
+    return new_deltas
 
 
-
-def compute_update(keys, deltas, method='sum'):
+def compute_update(keys, deltas, clipping_bound, noise_scale, method='sum'):
     mean_delta = []
+    updated_deltas = add_noise_clip_delta(deltas, clipping_bound, noise_scale)
     for i, key in enumerate(keys):
-        no_deltas = len(deltas)
+        no_deltas = len(updated_deltas)
         for j in range(no_deltas):
             if j == 0:
-                sum_delta = np.copy(deltas[j][i])
+                sum_delta = np.copy(updated_deltas[j][i])
             else:
-                sum_delta += deltas[j][i]
+                sum_delta += updated_deltas[j][i]
         if method == 'sum':
             mean_delta.append(sum_delta)
         elif method == 'mean':
@@ -104,57 +122,33 @@ def compute_update(keys, deltas, method='sum'):
     return mean_delta
 
 
-if __name__ == "__main__":
-    args = parser.parse_args()
-    ray.init(redis_address=args.redis_address, redirect_worker_output=False, redirect_output=False)
-    damping = args.damping
-    data_type = args.data_type
-    seed = args.seed
-    no_intervals = args.no_intervals
-    no_workers = args.num_workers
-    dataset = args.data
-    noise_std = args.noise_std
-    mean = args.mean
-    # param_file = args.param_file
-    #
-    # with open(param_file) as f:
-    #     dpsgd_params = json.load(f)['dpsgd_params']
-    #
-    # dpsgd_C = dpsgd_params['C']
-    # dpsgd_L = dpsgd_params['L']
-    # dpsgd_sigma = dpsgd_params['sigma']
-
-    noise_var = np.square(noise_std)
-
+def run_client_dp_analytical_pvi_sync(redis_address, mean, seed, max_eps, x_train, y_train, model_noise_std, data_func,
+                                      dp_noise_scale, no_workers, damping, no_intervals, clipping_bound):
+    ray.init(redis_address=redis_address, redirect_worker_output=False, redirect_output=False)
     np.random.seed(seed)
     tf.set_random_seed(seed)
 
-    if dataset == 'toy_1d':
-        data_func = lambda idx, N: data.get_toy_1d_shard(idx, N, data_type, mean, noise_std)
-
-    # Create a parameter server with some random params.
-    x_train, y_train, x_test, y_test = data_func(0, 1)
     n_train_master = x_train.shape[0]
-
     in_dim = x_train.shape[1]
-    accountant = MomentsAccountant(MomentsAccountantPolicy.FIXED_DELTA, 1e-5, 200, 32)
-    net = linreg_models.LinReg_MFVI_analytic(in_dim, n_train_master, accountant, noise_var=noise_var)
 
-    _, _, exact_mean_pres, exact_pres = exact_inference(x_train, y_train, net.prior_var_num, noise_std**2)
+    accountant = MomentsAccountant(MomentsAccountantPolicy.FIXED_DELTA_MAX_EPS, 1e-5, max_eps, 32)
+    net = linreg_models.LinReg_MFVI_analytic(in_dim, n_train_master, noise_var=model_noise_std ** 2)
+
+    _, _, exact_mean_pres, exact_pres = exact_inference(x_train, y_train, net.prior_var_num, model_noise_std ** 2)
     print("Exact Inference Params: {}, {}".format(exact_mean_pres, exact_pres))
 
     # accountant is not important here...
-    accountant.log_moments_increment = np.ones(32);
+    accountant.log_moments_increment = generate_log_moments(no_workers, 32, dp_noise_scale, no_workers)
     # accountant.log_moments_increment = net.generate_log_moments(n_train_master, 32)
     all_keys, all_values = net.get_params()
     ps = ParameterServer.remote(all_keys, all_values)
 
     timestr = time.strftime("%m-%d;%H:%M:%S")
-    path = 'logs/dp_analytical_sync_pvi/' + timestr + '/'
+    path = 'logs/client_dp_analytical_sync_pvi/' + timestr + '/'
     os.makedirs(path + "data/")
     # create workers
     workers = [
-        Worker.remote(i, no_workers, in_dim, data_func, path, noise_var, seed=seed)
+        Worker.remote(i, no_workers, in_dim, data_func, path, model_noise_std ** 2, seed=seed)
         for i in range(no_workers)]
     i = 0
     current_params = ray.get(ps.pull.remote(all_keys))
@@ -163,17 +157,16 @@ if __name__ == "__main__":
         os.makedirs(path)
 
     N_train_worker = data_func(0, no_workers)[0].shape[0]
-    # print("N Train Worker: {}".format(N_train_worker))
-    names = ["c", "dp_noise_scale",  "L", "N_train_worker",
+    names = ["N_train_worker",
              "Num_workers", "mean", "noise_var"]
-    params_save = net.get_params_for_logging()
+    params_save = []
     params_save.append(N_train_worker)
     params_save.append(no_workers)
     params_save.append(mean)
-    params_save.append(noise_var)
+    params_save.append(model_noise_std ** 2)
     param_file = path + 'settings.txt'
     text_file = open(param_file, "w")
-    text_file.write('DPSGD Parameters\n')
+    text_file.write('Parameters\n')
     for i in range(len(names)):
         text_file.write('{} : {:.2e} \n'.format(names[i], params_save[i]))
     text_file.write('Exact Inference (Non-PVI)\n')
@@ -182,13 +175,17 @@ if __name__ == "__main__":
 
     tracker_file = path + 'params.txt'
 
-    while i < no_intervals:
-        start_time = time.time()
+    accountant = MomentsAccountant(MomentsAccountantPolicy.FIXED_DELTA_MAX_EPS, 1e-5, max_eps , 32)
+    accountant.log_moments_increment = generate_log_moments(no_workers, 32, dp_noise_scale, no_workers)
+    should_stop = False
+    while i < no_intervals and not should_stop:
         deltas = [
             worker.get_delta.remote(
                 current_params, damping=damping)
             for worker in workers]
-        mean_delta = compute_update(all_keys, ray.get(deltas))
+        mean_delta = compute_update(all_keys, ray.get(deltas), clipping_bound, dp_noise_scale)
+        should_stop = accountant.update_privacy_budget()
+        print(accountant.current_tracked_val)
         ps.push.remote(all_keys, mean_delta)
         current_params = ray.get(ps.pull.remote(all_keys))
         print("Interval {} done".format(i))
@@ -203,11 +200,52 @@ if __name__ == "__main__":
     pres = current_params[1]
     var = 1 / pres
     mean = meanpres / pres
-    eps = workers[0].get_privacy_spent.remote()
-    eps = ray.get(eps)
+    eps = accountant.current_tracked_val
     plot_title = "({:.3e}, {:.3e})-DP".format(eps, 1e-5)
 
-    save_predictive_plot(path + 'pred.png', x_train, y_train, mean, var, noise_var, plot_title)
-    # report the privacy cost and plot onto the graph...
+    save_predictive_plot(path + 'pred.png', x_train, y_train, mean, var, model_noise_std ** 2, plot_title)
+    KL_loss = KL_Gaussians(exact_mean_pres, exact_pres, current_params[0], current_params[1])
     print(plot_title)
+    print(KL_loss)
+    ray.shutdown()
 
+    return eps, KL_loss
+
+
+if __name__ == "__main__":
+    args = parser.parse_args()
+
+    # load required arguments
+    damping_args = args.damping
+    data_type_args = args.data_type
+    seed_args = args.seed
+    no_intervals_args = args.no_intervals
+    no_workers_args = args.num_workers
+    dataset_args = args.data
+    noise_std_args = args.noise_std
+    mean_args = args.mean
+    dp_noise_scale_args = args.dp_noise_scale
+    clipping_bound_args = args.clipping_bound
+    redis_address_args = args.redis_address
+
+    # param_file = args.param_file
+    #
+    # with open(param_file) as f:
+    #     dpsgd_params = json.load(f)['dpsgd_params']
+    #
+    # dpsgd_C = dpsgd_params['C']
+    # dpsgd_L = dpsgd_params['L']
+    # dpsgd_sigma = dpsgd_params['sigma']
+
+    np.random.seed(seed_args)
+    tf.set_random_seed(seed_args)
+
+    if dataset_args == 'toy_1d':
+        data_func = lambda idx, N: data.get_toy_1d_shard(idx, N, data_type_args, mean_args, noise_std_args)
+
+    # Create a parameter server with some random params.
+    x_train, y_train, x_test, y_test = data_func(0, 1)
+
+    run_client_dp_analytical_pvi_sync(redis_address_args, mean_args, seed_args, 1, x_train, y_train, noise_std_args,
+                                      data_func, dp_noise_scale_args, no_workers_args, damping_args, no_intervals_args,
+                                      clipping_bound_args)
