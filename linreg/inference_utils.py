@@ -7,7 +7,7 @@ def save_predictive_plot(filepath, x_train, y_train, pred_mean, pred_var, noise_
     grid_vals = np.arange(start=-max_val, stop=max_val, step=grid_step)
     mean_pred = grid_vals * pred_mean
     # plot +-3 standard deviations
-    std_pred = 3*np.sqrt(noise_var + pred_var * np.square(grid_vals))
+    std_pred = 3*np.sqrt(pred_var * np.square(grid_vals))
     upper_pred = mean_pred + std_pred
     lower_pred = mean_pred - std_pred
     plt.plot(grid_vals, mean_pred, 'r')

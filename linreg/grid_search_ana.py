@@ -2,7 +2,7 @@ import numpy as np
 import tensorflow as tf
 
 import linreg.data as data
-from linreg_client_dp_ana_pvi_sync import run_client_dp_analytical_pvi_sync
+from linreg.linreg_dp_ana_pvi_sync import run_dp_analytical_pvi_sync
 import itertools
 import time
 import os
@@ -23,6 +23,7 @@ if __name__ == "__main__":
     max_eps_values = [1, 10, 30, 100]
     dp_noise_scales = [1e-3, 1e-2, 0.1, 1, 10]
     clipping_bounds = [1e-5, 1e-2, 1, 1e2, 1e5]
+    L_values = [10, 100, 500, 1000]
 
     np.random.seed(seed)
     tf.set_random_seed(seed)
@@ -33,7 +34,7 @@ if __name__ == "__main__":
     # Create a parameter server with some random params.
     x_train, y_train, x_test, y_test = data_func(0, 1)
 
-    param_combinations = list(itertools.product(max_eps_values, dp_noise_scales, clipping_bounds))
+    param_combinations = list(itertools.product(max_eps_values, dp_noise_scales, clipping_bounds, L_values))
     timestr = time.strftime("%m-%d;%H:%M:%S")
     path = 'logs/gs_client_linreg_dp/' + timestr + '/'
     os.makedirs(path)
@@ -45,17 +46,16 @@ if __name__ == "__main__":
         max_eps = param_combination[0]
         dp_noise_scale = param_combination[1]
         clipping_bound = param_combination[2]
-        results = run_client_dp_analytical_pvi_sync(None, mean, seed, max_eps, x_train, y_train, model_noise_std,
-                                                    data_func,
-                                                    dp_noise_scale, no_workers, damping, no_intervals, clipping_bound)
+        L = param_combination[3]
+        results = run_dp_analytical_pvi_sync(mean, seed, max_eps, x_train, y_train, model_noise_std, data_func,
+                                   dp_noise_scale, no_workers, damping, no_intervals, clipping_bound, L)
         eps = results[0]
         kl = results[1]
-        if kl < min_kl:
             print('New Min KL: {}'.format(kl))
             print(param_combination)
             min_kl = kl
 
         text_file = open(log_file, "a")
         text_file.write(
-            "max eps: {} eps: {} dp_noise: {} c: {} kl: {}\n".format(max_eps, eps, dp_noise_scale, clipping_bound, kl))
+            "max eps: {} eps: {} dp_noise: {} c: {} kl: {} L:{}\n".format(max_eps, eps, dp_noise_scale, clipping_bound, L, kl))
         text_file.close()

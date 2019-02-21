@@ -124,7 +124,6 @@ def compute_update(keys, deltas, clipping_bound, noise_scale, method='sum'):
 
 def run_client_dp_analytical_pvi_sync(redis_address, mean, seed, max_eps, x_train, y_train, model_noise_std, data_func,
                                       dp_noise_scale, no_workers, damping, no_intervals, clipping_bound):
-    ray.init(redis_address=redis_address, redirect_worker_output=False, redirect_output=False)
     np.random.seed(seed)
     tf.set_random_seed(seed)
 
@@ -138,8 +137,10 @@ def run_client_dp_analytical_pvi_sync(redis_address, mean, seed, max_eps, x_trai
     print("Exact Inference Params: {}, {}".format(exact_mean_pres, exact_pres))
 
     # accountant is not important here...
+    print('calculating log moments')
     accountant.log_moments_increment = generate_log_moments(no_workers, 32, dp_noise_scale, no_workers)
     # accountant.log_moments_increment = net.generate_log_moments(n_train_master, 32)
+    print('done calculating log moments - leggo')
     all_keys, all_values = net.get_params()
     ps = ParameterServer.remote(all_keys, all_values)
 
@@ -175,8 +176,6 @@ def run_client_dp_analytical_pvi_sync(redis_address, mean, seed, max_eps, x_trai
 
     tracker_file = path + 'params.txt'
 
-    accountant = MomentsAccountant(MomentsAccountantPolicy.FIXED_DELTA_MAX_EPS, 1e-5, max_eps , 32)
-    accountant.log_moments_increment = generate_log_moments(no_workers, 32, dp_noise_scale, no_workers)
     should_stop = False
     while i < no_intervals and not should_stop:
         deltas = [
@@ -207,7 +206,6 @@ def run_client_dp_analytical_pvi_sync(redis_address, mean, seed, max_eps, x_trai
     KL_loss = KL_Gaussians(exact_mean_pres, exact_pres, current_params[0], current_params[1])
     print(plot_title)
     print(KL_loss)
-    ray.shutdown()
 
     return eps, KL_loss
 
