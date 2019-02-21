@@ -7,6 +7,7 @@ import tensorflow_probability as tfp
 import numpy as np
 import math
 from linreg.tfutils import TensorFlowVariablesWithScope
+from linreg.log_moment_utils import generate_log_moments
 
 float_type = tf.float32
 int_type = tf.int32
@@ -1089,8 +1090,8 @@ class LinReg_MFVI_DP_analytic():
 
     def __init__(self, din, n_train, accountant, noise_var=1,
                  prior_mean=0.0, prior_var=1.0,
-                 init_seed=0, no_workers=1, clipping_bound=5,
-                 dp_noise_scale=1, L=1000, single_thread=True):
+                 init_seed=0, no_workers=1, clipping_bound=10,
+                 dp_noise_scale=0.01, L=1000, single_thread=True):
         self.din = din
         # input and output placeholders
         self.xtrain = tf.placeholder(float_type, [None, din], 'input')
@@ -1108,6 +1109,8 @@ class LinReg_MFVI_DP_analytic():
         self.w_n1, self.w_n2 = res[3], res[4]
         self.prior_mean, self.prior_var = res[5], res[6]
         self.local_n1, self.local_n2 = res[7], res[8]
+
+        self.prior_var_num = prior_var
 
         self.clipping_bound = clipping_bound
         self.dp_noise_scale = dp_noise_scale
@@ -1143,6 +1146,10 @@ class LinReg_MFVI_DP_analytic():
             self.energy_fn, self.sess,
             scope='variational_nat', input_variables=[self.w_n1, self.w_n2])
 
+    def get_params_for_logging(self):
+        # we want to save the dpsgd parameters we are gonna use
+        return [self.clipping_bound , self.dp_noise_scale, self.lot_size]
+
     def select_lot(self, lot_size, x, y):
         # select lot to perform SGD on
         N = x.shape[0]
@@ -1167,6 +1174,9 @@ class LinReg_MFVI_DP_analytic():
 
         x_red = red[0]
         y_red = red[1]
+        # set shapes - we know that the reduced input versions will be of this shape (by definition)
+        x_red.set_shape([L, 1])
+        y_red.set_shape([L])
 
         xTx_i = tf.einsum('na,na->n', x_red, x_red)
         xTy_i = tf.einsum('na,n->n', x_red, y_red)
@@ -1393,49 +1403,6 @@ class LinReg_MFVI_DP_analytic():
                     (vs, v), axis=concat_axis)
         return ms, vs
 
-    # these methods are the exact same as before
-    @staticmethod
-    def to_np_float_64(v):
-        if math.isnan(v) or math.isinf(v):
-            return np.inf
-        else:
-            return np.float64(v)
-
-    @staticmethod
-    def pdf_gauss(x, sigma, mean):
-        return mp.mpf(1.) / mp.sqrt(mp.mpf("2.") * sigma ** 2 * mp.pi) * mp.exp(
-            - (x - mean) ** 2 / (mp.mpf("2.") * sigma ** 2))
-
-    @staticmethod
-    def get_I1_I2_lambda(lambda_val, pdf1, pdf2):
-        I1_func = lambda x: pdf1(x) * (pdf1(x) / pdf2(x)) ** lambda_val
-        I2_func = lambda x: pdf2(x) * (pdf2(x) / pdf1(x)) ** lambda_val
-        return I1_func, I2_func
-
     def generate_log_moments(self, N, max_lambda):
-        L = self.lot_size
-        q = L / N
-
-        # generate pdfs which are to be integrated numerically
-        pdf1 = lambda x: LinReg_MFVI_DPSGD.pdf_gauss(x, self.dpsgd_noise_scale, mp.mpf(0))
-        pdf2 = lambda x: (1 - q) * LinReg_MFVI_DPSGD.pdf_gauss(x, self.dpsgd_noise_scale, mp.mpf(0)) + \
-                         q * LinReg_MFVI_DPSGD.pdf_gauss(x, self.dpsgd_noise_scale, mp.mpf(1))
-
-        # placeholder for alpha_M(lambda) for each iteration
-        alpha_M_lambda = np.zeros(max_lambda)
-
-        for lambda_val in range(1, max_lambda + 1):
-            # it isn't defined which dataset is D and which is D' - thus consider both and take the maximum
-            I1_func, I2_func = self.get_I1_I2_lambda(lambda_val, pdf1, pdf2)
-            I1_val, _ = mp.quad(I1_func, [-mp.inf, mp.inf], error=True)
-            I2_val, _ = mp.quad(I2_func, [-mp.inf, mp.inf], error=True)
-
-            I1_val = LinReg_MFVI_DPSGD.to_np_float_64(I1_val)
-            I2_val = LinReg_MFVI_DPSGD.to_np_float_64(I2_val)
-
-            if I1_val > I2_val:
-                alpha_M_lambda[lambda_val - 1] = np.log(I1_val)
-            else:
-                alpha_M_lambda[lambda_val - 1] = np.log(I2_val)
-
-        return alpha_M_lambda
+        return generate_log_moments(N, max_lambda, self.dp_noise_scale, self.lot_size)
+        
