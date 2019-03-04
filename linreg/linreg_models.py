@@ -1405,5 +1405,9 @@ class LinReg_MFVI_DP_analytic():
         return ms, vs
 
     def generate_log_moments(self, N, max_lambda):
+        print(N)
+        print(max_lambda)
+        print(self.dp_noise_scale)
+        print(self.lot_size)
         return generate_log_moments(N, max_lambda, self.dp_noise_scale, self.lot_size)
 

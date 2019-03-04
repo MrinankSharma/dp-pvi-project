@@ -18,11 +18,16 @@ if __name__ == "__main__":
     no_workers = 5
     damping = 0
     # will stop when the privacy budget is reached!
-    no_intervals = 100000
+    no_intervals = 100
 
     max_eps_values = [1, 10, 30, 100]
     dp_noise_scales = [1e-3, 1e-2, 0.1, 1, 10]
     clipping_bounds = [1e-5, 1e-2, 1, 1e2, 1e5]
+    L_values = [10, 100, 500]
+
+    max_eps_values = [1]
+    dp_noise_scales = [1e-3]
+    clipping_bounds = [1]
     L_values = [10, 100, 500, 1000]
 
     np.random.seed(seed)
@@ -35,8 +40,9 @@ if __name__ == "__main__":
     x_train, y_train, x_test, y_test = data_func(0, 1)
 
     param_combinations = list(itertools.product(max_eps_values, dp_noise_scales, clipping_bounds, L_values))
+
     timestr = time.strftime("%m-%d;%H:%M:%S")
-    path = 'logs/gs_client_linreg_dp/' + timestr + '/'
+    path = 'logs/gs_local_linreg_dp_ana/' + timestr + '/'
     os.makedirs(path)
     log_file = path + 'results.txt'
     min_kl = 10000
@@ -51,11 +57,12 @@ if __name__ == "__main__":
                                    dp_noise_scale, no_workers, damping, no_intervals, clipping_bound, L)
         eps = results[0]
         kl = results[1]
+        if kl<min_kl:
             print('New Min KL: {}'.format(kl))
             print(param_combination)
             min_kl = kl
 
         text_file = open(log_file, "a")
         text_file.write(
-            "max eps: {} eps: {} dp_noise: {} c: {} kl: {} L:{}\n".format(max_eps, eps, dp_noise_scale, clipping_bound, L, kl))
+            "max eps: {} eps: {} dp_noise: {} c: {} kl: {} L:{}\n".format(max_eps, eps, dp_noise_scale, clipping_bound, kl, L))
         text_file.close()

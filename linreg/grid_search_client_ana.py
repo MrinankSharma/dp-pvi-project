@@ -18,7 +18,7 @@ if __name__ == "__main__":
     no_workers = 5
     damping = 0
     # will stop when the privacy budget is reached!
-    no_intervals = 100000
+    no_intervals = 10000
 
     max_eps_values = [1, 10, 30, 100]
     dp_noise_scales = [1e-3, 1e-2, 0.1, 1, 10]

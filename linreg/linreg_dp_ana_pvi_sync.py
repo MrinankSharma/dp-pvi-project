@@ -72,6 +72,7 @@ class Worker(object):
             dp_noise_scale=dp_noise, L=L_in)
         # self.accountant.log_moments_increment = np.ones(32);
         self.accountant.log_moments_increment = self.net.generate_log_moments(n_train_worker, 32)
+        print(self.accountant.log_moments_increment)
         self.keys = self.net.get_params()[0]
         np.savetxt(log_path + "data/worker_{}_x.txt".format(worker_index), self.x_train)
         np.savetxt(log_path + "data/worker_{}_y.txt".format(worker_index), self.y_train)
@@ -108,6 +109,9 @@ def compute_update(keys, deltas, method='sum'):
 
 def run_dp_analytical_pvi_sync(mean, seed, max_eps, x_train, y_train, model_noise_std, data_func,
                                dp_noise_scale, no_workers, damping, no_intervals, clipping_bound, L):
+    # update seeds
+    np.random.seed(seed)
+    tf.set_random_seed(seed)
     n_train_master = x_train.shape[0]
 
     in_dim = x_train.shape[1]

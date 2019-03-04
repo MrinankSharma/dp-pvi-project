@@ -211,6 +211,7 @@ def run_client_dp_analytical_pvi_sync(redis_address, mean, seed, max_eps, x_trai
 
 
 if __name__ == "__main__":
+    ray.init()
     args = parser.parse_args()
 
     # load required arguments
