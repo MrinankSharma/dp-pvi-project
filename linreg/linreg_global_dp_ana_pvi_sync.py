@@ -42,14 +42,13 @@ parser.add_argument("--clipping-bound", default=10000, type=float,
 
 @ray.remote
 class ParameterServer(object):
-    def __init__(self, keys, values, conv_thres=0.01 * 1e-2, average_params=True):
+    def __init__(self, keys, values, conv_thres=0.00001*1e-2):
         # These values will be mutated, so we must create a copy that is not
         # backed by the object store.
         values = [value.copy() for value in values]
         self.params = dict(zip(keys, values))
         self.should_stop = False
         self.conv_thres = conv_thres
-        self.param_it_count = 1.0
 
     def push(self, keys, values):
         orig_vals = {}
@@ -58,30 +57,14 @@ class ParameterServer(object):
             orig_vals[key] = val
             updates[key] = 0
 
-        if self.average_params:
-            param_sum = {}
-            for key, value in self.params.iteritems():
-                param_sum[key] = value * self.param_it_count
-
-            # update params as before
-            for key, value in zip(keys, values):
-                self.params[key] += value
-                updates[key] += value
-
-            self.param_it_count += 1.0
-
-            for key, value in self.params.iteritems():
-                self.params[key] = (self.params[key] + param_sum[key]) / self.param_it_count
-
-        else:
-            for key, value in zip(keys, values):
-                self.params[key] += value
-                updates[key] += value
+        for key, value in zip(keys, values):
+            self.params[key] += value
+            updates[key] += value
 
         if not self.should_stop:
             self.should_stop = True
-            for k in keys:
-                val = np.abs(updates[k] / orig_vals[k])
+            for key in keys:
+                val = np.abs(updates[key] / orig_vals[key])
                 if val > self.conv_thres:
                     self.should_stop = False
 
