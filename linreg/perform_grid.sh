@@ -6,4 +6,4 @@ echo $PYTHONPATH
 
 # try different means
 python /Users/msharma/workspace/IIB/dp-pvi-project/linreg/grid_search_ana.py
-python /Users/msharma/workspace/IIB/dp-pvi-project/linreg/grid_search_client_ana.py
+python /Users/msharma/workspace/IIB/dp-pvi-project/linreg/grid_search_global_ana.py

@@ -42,14 +42,14 @@ parser.add_argument("--clipping-bound", default=10000, type=float,
 
 @ray.remote
 class ParameterServer(object):
-    def __init__(self, keys, values, conv_thres=0.01*1e-2):
+    def __init__(self, keys, values, conv_thres=0.01 * 1e-2, average_params=True):
         # These values will be mutated, so we must create a copy that is not
         # backed by the object store.
         values = [value.copy() for value in values]
         self.params = dict(zip(keys, values))
         self.should_stop = False
         self.conv_thres = conv_thres
-
+        self.param_it_count = 1.0
 
     def push(self, keys, values):
         orig_vals = {}
@@ -58,9 +58,25 @@ class ParameterServer(object):
             orig_vals[key] = val
             updates[key] = 0
 
-        for key, value in zip(keys, values):
-            self.params[key] += value
-            updates[key] += value
+        if self.average_params:
+            param_sum = {}
+            for key, value in self.params.iteritems():
+                param_sum[key] = value * self.param_it_count
+
+            # update params as before
+            for key, value in zip(keys, values):
+                self.params[key] += value
+                updates[key] += value
+
+            self.param_it_count += 1.0
+
+            for key, value in self.params.iteritems():
+                self.params[key] = (self.params[key] + param_sum[key]) / self.param_it_count
+
+        else:
+            for key, value in zip(keys, values):
+                self.params[key] += value
+                updates[key] += value
 
         if not self.should_stop:
             self.should_stop = True
@@ -69,12 +85,12 @@ class ParameterServer(object):
                 if val > self.conv_thres:
                     self.should_stop = False
 
-
     def pull(self, keys):
         return [self.params[key] for key in keys]
 
     def get_should_stop(self):
         return self.should_stop
+
 
 @ray.remote
 class Worker(object):
@@ -273,6 +289,7 @@ if __name__ == "__main__":
     # Create a parameter server with some random params.
     x_train, y_train, x_test, y_test = data_func(0, 1)
 
-    run_global_dp_analytical_pvi_sync(redis_address_args, mean_args, seed_args, np.inf, x_train, y_train, noise_std_args,
+    run_global_dp_analytical_pvi_sync(redis_address_args, mean_args, seed_args, np.inf, x_train, y_train,
+                                      noise_std_args,
                                       data_func, dp_noise_scale_args, no_workers_args, damping_args, no_intervals_args,
                                       clipping_bound_args)

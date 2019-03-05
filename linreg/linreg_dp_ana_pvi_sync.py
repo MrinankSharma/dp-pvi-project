@@ -133,7 +133,7 @@ def run_dp_analytical_pvi_sync(mean, seed, max_eps, x_train, y_train, model_nois
     n_train_master = x_train.shape[0]
 
     in_dim = x_train.shape[1]
-    accountant = MomentsAccountant(MomentsAccountantPolicy.FIXED_DELTA, 1e-5, 200, 32)
+    accountant = MomentsAccountant(MomentsAccountantPolicy.FIXED_DELTA, 1e-5, max_eps, 32)
     net = linreg_models.LinReg_MFVI_DP_analytic(in_dim, n_train_master, accountant, noise_var=model_noise_std ** 2)
 
     _, _, exact_mean_pres, exact_pres = exact_inference(x_train, y_train, net.prior_var_num, model_noise_std ** 2 ** 2)
@@ -195,7 +195,7 @@ def run_dp_analytical_pvi_sync(mean, seed, max_eps, x_train, y_train, model_nois
         with open(tracker_file, 'a') as file:
             file.write("{} {}\n".format(current_params[0], current_params[1]))
 
-        if ps.get_should_stop.remote():
+        if ray.get(ps.get_should_stop.remote()):
             # break from the while loop if we should stop, convergence wise.
             print("Converged - stop training")
             break
@@ -249,6 +249,10 @@ if __name__ == "__main__":
     # Create a parameter server with some random params.
     x_train, y_train, x_test, y_test = data_func(0, 1)
     L = 1000
-    run_dp_analytical_pvi_sync(mean_args, seed_args, 1, x_train, y_train, noise_std_args, data_func,
+
+    max_eps = np.inf
+    noise_scale = 1
+    c = 10
+    run_dp_analytical_pvi_sync(mean_args, seed_args, max_eps, x_train, y_train, noise_std_args, data_func,
                                1, no_workers_args, damping_args, no_intervals_args,
-                               10, L)
+                               c, L)
