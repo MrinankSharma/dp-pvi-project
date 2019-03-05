@@ -2,7 +2,7 @@ import numpy as np
 import tensorflow as tf
 
 import linreg.data as data
-from linreg_client_dp_ana_pvi_sync import run_client_dp_analytical_pvi_sync
+from linreg_global_dp_ana_pvi_sync import run_client_dp_analytical_pvi_sync
 import itertools
 import time
 import os
@@ -19,10 +19,17 @@ if __name__ == "__main__":
     damping = 0
     # will stop when the privacy budget is reached!
     no_intervals = 10000
+    N_dp_seeds = 5
+
+    dp_seeds = np.arange(1, N_dp_seeds)
 
     max_eps_values = [1, 10, 30, 100]
     dp_noise_scales = [1e-3, 1e-2, 0.1, 1, 10]
     clipping_bounds = [1e-5, 1e-2, 1, 1e2, 1e5]
+
+    max_eps_values = [1]
+    dp_noise_scales = [1e-3]
+    clipping_bounds = [1]
 
     np.random.seed(seed)
     tf.set_random_seed(seed)
@@ -45,9 +52,25 @@ if __name__ == "__main__":
         max_eps = param_combination[0]
         dp_noise_scale = param_combination[1]
         clipping_bound = param_combination[2]
-        results = run_client_dp_analytical_pvi_sync(None, mean, seed, max_eps, x_train, y_train, model_noise_std,
-                                                    data_func,
-                                                    dp_noise_scale, no_workers, damping, no_intervals, clipping_bound)
+
+        eps_i = np.zeros(N_dp_seeds)
+        kl_i = np.zeros(N_dp_seeds)
+
+        for ind, seed in enumerate(dp_seeds):
+            results = run_client_dp_analytical_pvi_sync(None, mean, seed, max_eps, x_train, y_train, model_noise_std,
+                                                        data_func,
+                                                        dp_noise_scale, no_workers, damping, no_intervals,
+                                                        clipping_bound)
+            eps = results[0]
+            kl = results[1]
+            eps_i[ind] = eps
+            kl_i[ind] = kl
+
+        eps = np.mean(eps_i)
+        kl = np.mean(kl_i)
+        eps_var = np.var(eps_i)
+        kl_var = np.var(kl_i)
+
         eps = results[0]
         kl = results[1]
         if kl < min_kl:

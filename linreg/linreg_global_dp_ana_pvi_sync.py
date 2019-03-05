@@ -36,25 +36,45 @@ parser.add_argument("--noise-std", default=1, type=float,
                     help="Noise Standard Deviation")
 parser.add_argument("--dp-noise-scale", default=1, type=float,
                     help="DP Noise")
-parser.add_argument("--clipping-bound", default=1, type=float,
+parser.add_argument("--clipping-bound", default=10000, type=float,
                     help="DP clipping")
 
 
 @ray.remote
 class ParameterServer(object):
-    def __init__(self, keys, values):
+    def __init__(self, keys, values, conv_thres=0.01*1e-2):
         # These values will be mutated, so we must create a copy that is not
         # backed by the object store.
         values = [value.copy() for value in values]
         self.params = dict(zip(keys, values))
+        self.should_stop = False
+        self.conv_thres = conv_thres
+
 
     def push(self, keys, values):
+        orig_vals = {}
+        updates = {}
+        for key, val in self.params.iteritems():
+            orig_vals[key] = val
+            updates[key] = 0
+
         for key, value in zip(keys, values):
             self.params[key] += value
+            updates[key] += value
+
+        if not self.should_stop:
+            self.should_stop = True
+            for k in keys:
+                val = np.abs(updates[k] / orig_vals[k])
+                if val > self.conv_thres:
+                    self.should_stop = False
+
 
     def pull(self, keys):
         return [self.params[key] for key in keys]
 
+    def get_should_stop(self):
+        return self.should_stop
 
 @ray.remote
 class Worker(object):
@@ -122,8 +142,10 @@ def compute_update(keys, deltas, clipping_bound, noise_scale, method='sum'):
     return mean_delta
 
 
-def run_client_dp_analytical_pvi_sync(redis_address, mean, seed, max_eps, x_train, y_train, model_noise_std, data_func,
+def run_global_dp_analytical_pvi_sync(redis_address, mean, seed, max_eps, x_train, y_train, model_noise_std, data_func,
                                       dp_noise_scale, no_workers, damping, no_intervals, clipping_bound):
+    np.random.seed(seed)
+    tf.set_random_seed(seed)
     np.random.seed(seed)
     tf.set_random_seed(seed)
 
@@ -140,7 +162,6 @@ def run_client_dp_analytical_pvi_sync(redis_address, mean, seed, max_eps, x_trai
     print('calculating log moments')
     accountant.log_moments_increment = generate_log_moments(no_workers, 32, dp_noise_scale, no_workers)
     # accountant.log_moments_increment = net.generate_log_moments(n_train_master, 32)
-    print('done calculating log moments - leggo')
     all_keys, all_values = net.get_params()
     ps = ParameterServer.remote(all_keys, all_values)
 
@@ -176,15 +197,13 @@ def run_client_dp_analytical_pvi_sync(redis_address, mean, seed, max_eps, x_trai
 
     tracker_file = path + 'params.txt'
 
-    should_stop = False
-    while i < no_intervals and not should_stop:
+    while i < no_intervals:
         deltas = [
             worker.get_delta.remote(
                 current_params, damping=damping)
             for worker in workers]
         mean_delta = compute_update(all_keys, ray.get(deltas), clipping_bound, dp_noise_scale)
-        should_stop = accountant.update_privacy_budget()
-        print(accountant.current_tracked_val)
+        should_stop_priv = accountant.update_privacy_budget()
         ps.push.remote(all_keys, mean_delta)
         current_params = ray.get(ps.pull.remote(all_keys))
         print("Interval {} done".format(i))
@@ -194,6 +213,15 @@ def run_client_dp_analytical_pvi_sync(redis_address, mean, seed, max_eps, x_trai
         # save to file, tracking stuff
         with open(tracker_file, 'a') as file:
             file.write("{} {}\n".format(current_params[0], current_params[1]))
+
+        if ray.get(ps.get_should_stop.remote()):
+            # break from the while loop if we should stop, convergence wise.
+            print("Converged - stop training")
+            break
+
+        if should_stop_priv:
+            print("Exceeded Privacy Budget - stop training")
+            break
 
     meanpres = current_params[0]
     pres = current_params[1]
@@ -245,6 +273,6 @@ if __name__ == "__main__":
     # Create a parameter server with some random params.
     x_train, y_train, x_test, y_test = data_func(0, 1)
 
-    run_client_dp_analytical_pvi_sync(redis_address_args, mean_args, seed_args, 1, x_train, y_train, noise_std_args,
+    run_global_dp_analytical_pvi_sync(redis_address_args, mean_args, seed_args, np.inf, x_train, y_train, noise_std_args,
                                       data_func, dp_noise_scale_args, no_workers_args, damping_args, no_intervals_args,
                                       clipping_bound_args)

@@ -39,18 +39,37 @@ parser.add_argument("--noise-std", default=1, type=float,
 
 @ray.remote
 class ParameterServer(object):
-    def __init__(self, keys, values):
+    def __init__(self, keys, values, conv_thres=0.00001*1e-2):
         # These values will be mutated, so we must create a copy that is not
         # backed by the object store.
         values = [value.copy() for value in values]
         self.params = dict(zip(keys, values))
+        self.should_stop = False
+        self.conv_thres = conv_thres
 
     def push(self, keys, values):
+        orig_vals = {}
+        updates = {}
+        for key, val in self.params.iteritems():
+            orig_vals[key] = val
+            updates[key] = 0
+
         for key, value in zip(keys, values):
             self.params[key] += value
+            updates[key] += value
+
+        if not self.should_stop:
+            self.should_stop = True
+            for key in keys:
+                val = np.abs(updates[key] / orig_vals[key])
+                if val > self.conv_thres:
+                    self.should_stop = False
 
     def pull(self, keys):
         return [self.params[key] for key in keys]
+
+    def get_should_stop(self):
+        return self.should_stop
 
 
 @ray.remote
@@ -72,7 +91,6 @@ class Worker(object):
             dp_noise_scale=dp_noise, L=L_in)
         # self.accountant.log_moments_increment = np.ones(32);
         self.accountant.log_moments_increment = self.net.generate_log_moments(n_train_worker, 32)
-        print(self.accountant.log_moments_increment)
         self.keys = self.net.get_params()[0]
         np.savetxt(log_path + "data/worker_{}_x.txt".format(worker_index), self.x_train)
         np.savetxt(log_path + "data/worker_{}_y.txt".format(worker_index), self.y_train)
@@ -162,7 +180,6 @@ def run_dp_analytical_pvi_sync(mean, seed, max_eps, x_train, y_train, model_nois
     tracker_file = path + 'params.txt'
 
     while i < no_intervals:
-        start_time = time.time()
         deltas = [
             worker.get_delta.remote(
                 current_params, damping=damping)
@@ -177,6 +194,11 @@ def run_dp_analytical_pvi_sync(mean, seed, max_eps, x_train, y_train, model_nois
         # save to file, tracking stuff
         with open(tracker_file, 'a') as file:
             file.write("{} {}\n".format(current_params[0], current_params[1]))
+
+        if ps.get_should_stop.remote():
+            # break from the while loop if we should stop, convergence wise.
+            print("Converged - stop training")
+            break
 
     meanpres = current_params[0]
     pres = current_params[1]
