@@ -17,21 +17,16 @@ if __name__ == "__main__":
     model_noise_std = 0.5
     no_workers = 5
     damping = 0
-    N_dp_seeds = 5
+    N_dp_seeds = 50
     # will stop when the privacy budget is reached!
-    no_intervals = 100
+    no_intervals = 10000
 
     dp_seeds = np.arange(1, N_dp_seeds)
 
-    max_eps_values = [1, 10, 30, 100]
+    max_eps_values = [1, 10, 100, 1000, 10000]
     dp_noise_scales = [1e-3, 1e-2, 0.1, 1, 10]
     clipping_bounds = [1e-5, 1e-2, 1, 1e2, 1e5]
     L_values = [10, 100, 500]
-
-    max_eps_values = [1]
-    dp_noise_scales = [1e-3]
-    clipping_bounds = [1]
-    L_values = [10, 1000]
 
     np.random.seed(seed)
     tf.set_random_seed(seed)

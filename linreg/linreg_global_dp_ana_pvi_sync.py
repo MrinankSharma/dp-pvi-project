@@ -42,7 +42,7 @@ parser.add_argument("--clipping-bound", default=10000, type=float,
 
 @ray.remote
 class ParameterServer(object):
-    def __init__(self, keys, values, conv_thres=0.0001 * 1e-2, average_params=False):
+    def __init__(self, keys, values, conv_thres=0.001 * 1e-2, average_params=False):
         # These values will be mutated, so we must create a copy that is not
         # backed by the object store.
         values = [value.copy() for value in values]
