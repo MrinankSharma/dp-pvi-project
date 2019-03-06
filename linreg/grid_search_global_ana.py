@@ -1,6 +1,8 @@
 import numpy as np
 import tensorflow as tf
 
+import argparse
+
 import linreg.data as data
 from linreg_global_dp_ana_pvi_sync import run_global_dp_analytical_pvi_sync
 import itertools
@@ -8,7 +10,15 @@ import time
 import os
 import ray
 
+parser = argparse.ArgumentParser(description="grid search for whole client level dp")
+parser.add_argument("--output-base-dir", default='', type=str,
+                    help="output base folder.")
+
 if __name__ == "__main__":
+    args = parser.parse_args()
+    output_base_dir = args.output_base_dir
+    print(output_base_dir)
+
     # really, we should average over multiple seeds
     seed = 42
     dataset = 'toy_1d'
@@ -38,7 +48,8 @@ if __name__ == "__main__":
 
     param_combinations = list(itertools.product(max_eps_values, dp_noise_scales, clipping_bounds))
     timestr = time.strftime("%m-%d;%H:%M:%S")
-    path = 'logs/gs_client_linreg_dp/' + timestr + '/'
+    path = output_base_dir
+    path = path + 'logs/gs_client_linreg_dp/' + timestr + '/'
     os.makedirs(path)
     log_file = path + 'results.txt'
     min_kl = 10000
@@ -61,7 +72,7 @@ if __name__ == "__main__":
             results = run_global_dp_analytical_pvi_sync.remote(None, mean, seed, max_eps, x_train, y_train, model_noise_std,
                                                         data_func,
                                                         dp_noise_scale, no_workers, damping, no_intervals,
-                                                        clipping_bound)
+                                                        clipping_bound, output_base_dir)
             results_objects.append((results, ind))
 
         # fetch one by one

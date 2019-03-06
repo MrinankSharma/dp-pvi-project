@@ -161,7 +161,7 @@ def compute_update(keys, deltas, clipping_bound, noise_scale, method='sum'):
 
 @ray.remote
 def run_global_dp_analytical_pvi_sync(redis_address, mean, seed, max_eps, x_train, y_train, model_noise_std, data_func,
-                                      dp_noise_scale, no_workers, damping, no_intervals, clipping_bound):
+                                      dp_noise_scale, no_workers, damping, no_intervals, clipping_bound, output_base_dir):
     np.random.seed(seed)
     tf.set_random_seed(seed)
     np.random.seed(seed)
@@ -185,7 +185,8 @@ def run_global_dp_analytical_pvi_sync(redis_address, mean, seed, max_eps, x_trai
 
     timestr = time.strftime("%m-%d;%H:%M:%S")
     timestr = timestr + "-s-"+str(seed)
-    path = 'logs/global_dp_analytical_sync_pvi/' + timestr + '/'
+    path = output_base_dir
+    path = path + 'logs/global_dp_analytical_sync_pvi/' + timestr + '/'
     os.makedirs(path + "data/")
     # create workers
     workers = [

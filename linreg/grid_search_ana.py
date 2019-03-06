@@ -1,6 +1,8 @@
 import numpy as np
 import tensorflow as tf
 
+import argparse
+
 import linreg.data as data
 from linreg.linreg_dp_ana_pvi_sync import run_dp_analytical_pvi_sync
 import itertools
@@ -8,7 +10,15 @@ import time
 import os
 import ray
 
+parser = argparse.ArgumentParser(description="grid search for whole client level dp")
+parser.add_argument("--output-base-dir", default='', type=str,
+                    help="output base folder.")
+
 if __name__ == "__main__":
+    args = parser.parse_args()
+    output_base_dir = args.output_base_dir
+    print(output_base_dir)
+
     # really, we should average over multiple seeds
     seed = 42
     dataset = 'toy_1d'
@@ -40,6 +50,7 @@ if __name__ == "__main__":
     param_combinations = list(itertools.product(max_eps_values, dp_noise_scales, clipping_bounds, L_values))
 
     timestr = time.strftime("%m-%d;%H:%M:%S")
+    path = output_base_dir
     path = 'logs/gs_local_linreg_dp_ana/' + timestr + '/'
     os.makedirs(path)
     log_file = path + 'results.txt'
@@ -58,7 +69,7 @@ if __name__ == "__main__":
 
         for ind, seed in enumerate(dp_seeds):
             results = ray.get(run_dp_analytical_pvi_sync.remote(mean, seed, max_eps, x_train, y_train, model_noise_std, data_func,
-                                                 dp_noise_scale, no_workers, damping, no_intervals, clipping_bound, L))
+                                                 dp_noise_scale, no_workers, damping, no_intervals, clipping_bound, L, output_base_dir))
             eps = results[0]
             kl = results[1]
             eps_i[ind] = eps

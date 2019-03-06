@@ -146,7 +146,7 @@ def compute_update(keys, deltas, method='sum'):
 
 @ray.remote
 def run_dp_analytical_pvi_sync(mean, seed, max_eps, x_train, y_train, model_noise_std, data_func,
-                               dp_noise_scale, no_workers, damping, no_intervals, clipping_bound, L):
+                               dp_noise_scale, no_workers, damping, no_intervals, clipping_bound, L, output_base_dir):
     # update seeds
     np.random.seed(seed)
     tf.set_random_seed(seed)
@@ -167,7 +167,8 @@ def run_dp_analytical_pvi_sync(mean, seed, max_eps, x_train, y_train, model_nois
 
     timestr = time.strftime("%m-%d;%H:%M:%S")
     timestr = timestr + "-s-" + str(seed)
-    path = 'logs/dp_analytical_sync_pvi/' + timestr + '/'
+    path = output_base_dir
+    path = path + 'logs/dp_analytical_sync_pvi/' + timestr + '/'
     os.makedirs(path + "data/")
     # create workers
     workers = [
