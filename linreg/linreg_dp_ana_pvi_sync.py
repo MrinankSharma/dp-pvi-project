@@ -230,7 +230,7 @@ def run_dp_analytical_pvi_sync(mean, seed, max_eps, x_train, y_train, model_nois
     eps = ray.get(eps)
     plot_title = "({:.3e}, {:.3e})-DP".format(eps, 1e-5)
 
-    save_predictive_plot(path + 'pred.png', x_train, y_train, mean, var, model_noise_std**2, plot_title)
+    # save_predictive_plot(path + 'pred.png', x_train, y_train, mean, var, model_noise_std**2, plot_title)
     # report the privacy cost and plot onto the graph...
     print(plot_title)
     KL_loss = KL_Gaussians(exact_mean_pres, exact_pres, current_params[0], current_params[1])

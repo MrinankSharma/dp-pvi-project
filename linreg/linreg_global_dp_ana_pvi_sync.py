@@ -250,7 +250,7 @@ def run_global_dp_analytical_pvi_sync(redis_address, mean, seed, max_eps, x_trai
     eps = accountant.current_tracked_val
     plot_title = "({:.3e}, {:.3e})-DP".format(eps, 1e-5)
 
-    save_predictive_plot(path + 'pred.png', x_train, y_train, mean, var, model_noise_std ** 2, plot_title)
+    # save_predictive_plot(path + 'pred.png', x_train, y_train, mean, var, model_noise_std ** 2, plot_title)
     KL_loss = KL_Gaussians(exact_mean_pres, exact_pres, current_params[0], current_params[1])
     print(plot_title)
     print(KL_loss)
