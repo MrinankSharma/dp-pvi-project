@@ -2,7 +2,7 @@ import numpy as np
 import tensorflow as tf
 
 import linreg.data as data
-from linreg_global_dp_ana_pvi_sync import run_client_dp_analytical_pvi_sync
+from linreg_global_dp_ana_pvi_sync import run_global_dp_analytical_pvi_sync
 import itertools
 import time
 import os
@@ -18,10 +18,10 @@ if __name__ == "__main__":
     no_workers = 5
     damping = 0
     # will stop when the privacy budget is reached!
-    no_intervals = 10000
-    N_dp_seeds = 5
+    no_intervals = 20
+    N_dp_seeds = 2
 
-    dp_seeds = np.arange(1, N_dp_seeds)
+    dp_seeds = np.arange(1, N_dp_seeds+1)
 
     max_eps_values = [1, 10, 30, 100]
     dp_noise_scales = [1e-3, 1e-2, 0.1, 1, 10]
@@ -56,11 +56,22 @@ if __name__ == "__main__":
         eps_i = np.zeros(N_dp_seeds)
         kl_i = np.zeros(N_dp_seeds)
 
+        results_objects = []
+
+        # this code parallises the executtion of multiple seeds at once, then collects results for them.
+
+        # start everything running...
         for ind, seed in enumerate(dp_seeds):
-            results = run_client_dp_analytical_pvi_sync(None, mean, seed, max_eps, x_train, y_train, model_noise_std,
+            results = run_global_dp_analytical_pvi_sync.remote(None, mean, seed, max_eps, x_train, y_train, model_noise_std,
                                                         data_func,
                                                         dp_noise_scale, no_workers, damping, no_intervals,
                                                         clipping_bound)
+            results_objects.append((results, ind))
+
+        # fetch one by one
+        for results_tup in results_objects:
+            [results_obj, ind] = results_tup
+            results = ray.get(results_obj)
             eps = results[0]
             kl = results[1]
             eps_i[ind] = eps
@@ -80,5 +91,9 @@ if __name__ == "__main__":
 
         text_file = open(log_file, "a")
         text_file.write(
-            "max eps: {} eps: {} dp_noise: {} c: {} kl: {}\n".format(max_eps, eps, dp_noise_scale, clipping_bound, kl))
+            "max eps: {} eps: {} eps_var: {:.4e} dp_noise: {} c: {} kl: {} kl_var: {:.4e}\n".format(max_eps, eps,
+                                                                                                          eps_var,
+                                                                                                          dp_noise_scale,
+                                                                                                          clipping_bound,
+                                                                                                          kl, kl_var))
         text_file.close()

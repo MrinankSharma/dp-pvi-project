@@ -38,14 +38,14 @@ parser.add_argument("--noise-std", default=1, type=float,
 
 @ray.remote
 class ParameterServer(object):
-    def __init__(self, keys, values, conv_thres=0.0001 * 1e-2, average_params=True):
+    def __init__(self, keys, values, conv_thres=0.01 * 1e-2, average_params=True):
         # These values will be mutated, so we must create a copy that is not
         # backed by the object store.
         values = [value.copy() for value in values]
         self.params = dict(zip(keys, values))
         self.should_stop = False
         self.conv_thres = conv_thres
-        self.param_it_count = 1.0
+        self.param_it_count = 0.0
         self.average_params = average_params
 
     def push(self, keys, values):
@@ -58,11 +58,13 @@ class ParameterServer(object):
         if self.average_params:
             param_sum = {}
             for key, value in self.params.iteritems():
+                # print("Param {} has value {} after {} runs".format(key, value, self.param_it_count))
                 param_sum[key] = value * self.param_it_count
 
             # update params as before
             for key, value in zip(keys, values):
                 self.params[key] += value
+                # print("The New Param {} value is {} after {} runs".format(key, self.params[key], self.param_it_count))
                 updates[key] += value
 
             self.param_it_count += 1.0
@@ -142,6 +144,7 @@ def compute_update(keys, deltas, method='sum'):
     return mean_delta
 
 
+@ray.remote
 def run_dp_analytical_pvi_sync(mean, seed, max_eps, x_train, y_train, model_noise_std, data_func,
                                dp_noise_scale, no_workers, damping, no_intervals, clipping_bound, L):
     # update seeds
@@ -163,6 +166,7 @@ def run_dp_analytical_pvi_sync(mean, seed, max_eps, x_train, y_train, model_nois
     ps = ParameterServer.remote(all_keys, all_values)
 
     timestr = time.strftime("%m-%d;%H:%M:%S")
+    timestr = timestr + "-s-" + str(seed)
     path = 'logs/dp_analytical_sync_pvi/' + timestr + '/'
     os.makedirs(path + "data/")
     # create workers
@@ -268,8 +272,8 @@ if __name__ == "__main__":
     L = 1000
 
     max_eps = np.inf
-    noise_scale = 1
-    c = 10
-    run_dp_analytical_pvi_sync(mean_args, seed_args, max_eps, x_train, y_train, noise_std_args, data_func,
-                               1, no_workers_args, damping_args, no_intervals_args,
-                               c, L)
+    noise_scale = 0.0001
+    c = 10000
+    ray.get(run_dp_analytical_pvi_sync.remote(mean_args, seed_args, max_eps, x_train, y_train, noise_std_args, data_func,
+                               noise_scale, no_workers_args, damping_args, no_intervals_args,
+                               c, L))

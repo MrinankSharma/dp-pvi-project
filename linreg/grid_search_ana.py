@@ -62,8 +62,8 @@ if __name__ == "__main__":
         kl_i = np.zeros(N_dp_seeds)
 
         for ind, seed in enumerate(dp_seeds):
-            results = run_dp_analytical_pvi_sync(mean, seed, max_eps, x_train, y_train, model_noise_std, data_func,
-                                                 dp_noise_scale, no_workers, damping, no_intervals, clipping_bound, L)
+            results = ray.get(run_dp_analytical_pvi_sync.remote(mean, seed, max_eps, x_train, y_train, model_noise_std, data_func,
+                                                 dp_noise_scale, no_workers, damping, no_intervals, clipping_bound, L))
             eps = results[0]
             kl = results[1]
             eps_i[ind] = eps
