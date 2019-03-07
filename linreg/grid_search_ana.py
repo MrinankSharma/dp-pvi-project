@@ -27,7 +27,7 @@ if __name__ == "__main__":
     model_noise_std = 0.5
     no_workers = 5
     damping = 0
-    N_dp_seeds = 2
+    N_dp_seeds = 30
     # will stop when the privacy budget is reached!
     no_intervals = 10000
 
@@ -51,7 +51,7 @@ if __name__ == "__main__":
 
     timestr = time.strftime("%m-%d;%H:%M:%S")
     path = output_base_dir
-    path = 'logs/gs_local_linreg_dp_ana/' + timestr + '/'
+    path = output_base_dir + 'logs/gs_local_linreg_dp_ana/' + timestr + '/'
     os.makedirs(path)
     log_file = path + 'results.txt'
     min_kl = 10000

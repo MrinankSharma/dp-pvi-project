@@ -29,7 +29,7 @@ if __name__ == "__main__":
     damping = 0
     # will stop when the privacy budget is reached!
     no_intervals = 10000
-    N_dp_seeds = 50
+    N_dp_seeds = 30
 
     dp_seeds = np.arange(1, N_dp_seeds+1)
 
