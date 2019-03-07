@@ -2,8 +2,6 @@ import tensorflow as tf
 import numpy as np
 import math
 
-from repoze.lru import lru_cache
-
 float_type = tf.float32
 int_type = tf.int32
 
