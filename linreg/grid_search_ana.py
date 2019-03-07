@@ -56,7 +56,7 @@ if __name__ == "__main__":
     path = output_base_dir + 'logs/gs_local_linreg_dp_ana/' + timestr + '/'
     os.makedirs(path)
     log_file = path + 'results.txt'
-    csv_file = path + 'results.csv'
+    csv_file_path = path + 'results.csv'
     min_kl = 10000
     ray.init()
     for param_combination in param_combinations:
@@ -112,7 +112,7 @@ if __name__ == "__main__":
                                                                                                           kl, kl_var,
                                                                                                           L))
         text_file.close()
-        csv_file = open(csv_file, "a")
+        csv_file = open(csv_file_path, "a")
         csv_file.write(
             "{},{},{:.4e},{},{},{},{:.4e},{}\n".format(max_eps, eps, eps_var, dp_noise_scale, clipping_bound, kl,
                                                        kl_var, L))
