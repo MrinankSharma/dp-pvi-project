@@ -53,6 +53,7 @@ if __name__ == "__main__":
     path = path + 'logs/gs_client_linreg_dp/' + timestr + '/'
     os.makedirs(path)
     log_file = path + 'results.txt'
+    csv_file = path + 'results.csv'
     min_kl = 10000
     ray.init()
     for param_combination in param_combinations:
@@ -108,3 +109,9 @@ if __name__ == "__main__":
                                                                                                           clipping_bound,
                                                                                                           kl, kl_var))
         text_file.close()
+        csv_file = open(csv_file, "a")
+        csv_file.write(
+            "{},{},{:.4e},{},{},{},{:.4e}\n".format(max_eps, eps, eps_var, dp_noise_scale, clipping_bound, kl,
+                                                       kl_var))
+        csv_file.close()
+

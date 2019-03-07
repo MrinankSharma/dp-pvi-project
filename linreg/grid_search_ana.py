@@ -33,7 +33,7 @@ if __name__ == "__main__":
     # will stop when the privacy budget is reached!
     no_intervals = 5000
 
-    dp_seeds = np.arange(1, N_dp_seeds+1)
+    dp_seeds = np.arange(1, N_dp_seeds + 1)
 
     max_eps_values = [1, 100, 10000]
     dp_noise_scales = [1e-3, 1e-2, 0.1, 1, 10]
@@ -56,6 +56,7 @@ if __name__ == "__main__":
     path = output_base_dir + 'logs/gs_local_linreg_dp_ana/' + timestr + '/'
     os.makedirs(path)
     log_file = path + 'results.txt'
+    csv_file = path + 'results.csv'
     min_kl = 10000
     ray.init()
     for param_combination in param_combinations:
@@ -74,12 +75,11 @@ if __name__ == "__main__":
 
         # start everything running...
         for ind, seed in enumerate(dp_seeds):
-
             results = run_dp_analytical_pvi_sync.remote(mean, seed, max_eps, x_train, y_train,
-                                                               model_noise_std,
-                                                               data_func,
-                                                               dp_noise_scale, no_workers, damping, no_intervals,
-                                                               clipping_bound, L, output_base_dir, log_moments)
+                                                        model_noise_std,
+                                                        data_func,
+                                                        dp_noise_scale, no_workers, damping, no_intervals,
+                                                        clipping_bound, L, output_base_dir, log_moments)
             results_objects.append((results, ind))
 
         # fetch one by one
@@ -101,14 +101,19 @@ if __name__ == "__main__":
             print(param_combination)
             min_kl = kl
 
-        print(log_file)
-        print('logging!')
+        # print(log_file)
+        # print('logging!')
         text_file = open(log_file, "a")
         text_file.write(
-            "max eps: {} eps: {} eps_var: {:.4e} dp_noise: {} c: {} kl: {} kl_var: {:.4e}  L:{}\n".format(max_eps, eps,
+            "max_eps: {} eps: {} eps_var: {:.4e} dp_noise: {} c: {} kl: {} kl_var: {:.4e}  L:{}\n".format(max_eps, eps,
                                                                                                           eps_var,
                                                                                                           dp_noise_scale,
                                                                                                           clipping_bound,
                                                                                                           kl, kl_var,
                                                                                                           L))
         text_file.close()
+        csv_file = open(csv_file, "a")
+        csv_file.write(
+            "{},{},{:.4e},{},{},{},{:.4e},{}\n".format(max_eps, eps, eps_var, dp_noise_scale, clipping_bound, kl,
+                                                       kl_var, L))
+        csv_file.close()
