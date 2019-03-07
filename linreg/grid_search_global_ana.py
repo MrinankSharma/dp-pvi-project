@@ -5,6 +5,7 @@ import argparse
 
 import linreg.data as data
 from linreg_global_dp_ana_pvi_sync import run_global_dp_analytical_pvi_sync
+from log_moment_utils import generate_log_moments
 import itertools
 import time
 import os
@@ -28,14 +29,14 @@ if __name__ == "__main__":
     no_workers = 5
     damping = 0
     # will stop when the privacy budget is reached!
-    no_intervals = 10000
-    N_dp_seeds = 30
+    no_intervals = 5000
+    N_dp_seeds = 10
 
     dp_seeds = np.arange(1, N_dp_seeds+1)
 
-    max_eps_values = [1, 10, 30, 100]
+    max_eps_values = [1, 10, 100]
     dp_noise_scales = [1e-3, 1e-2, 0.1, 1, 10]
-    clipping_bounds = [1e-5, 1e-2, 1, 1e2, 1e5]
+    clipping_bounds = [1e-3, 1e-1, 1, 1e1, 1e2]
 
     np.random.seed(seed)
     tf.set_random_seed(seed)
@@ -64,15 +65,18 @@ if __name__ == "__main__":
         kl_i = np.zeros(N_dp_seeds)
 
         results_objects = []
+        log_moments = generate_log_moments(5, 32, dp_noise_scale, 5)
 
         # this code parallises the executtion of multiple seeds at once, then collects results for them.
 
         # start everything running...
         for ind, seed in enumerate(dp_seeds):
+            # hack to cache results
+
             results = run_global_dp_analytical_pvi_sync.remote(None, mean, seed, max_eps, x_train, y_train, model_noise_std,
                                                         data_func,
                                                         dp_noise_scale, no_workers, damping, no_intervals,
-                                                        clipping_bound, output_base_dir)
+                                                        clipping_bound, output_base_dir, log_moments)
             results_objects.append((results, ind))
 
         # fetch one by one

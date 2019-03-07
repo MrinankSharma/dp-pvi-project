@@ -10,6 +10,8 @@ import time
 import os
 import ray
 
+from linreg.log_moment_utils import generate_log_moments
+
 parser = argparse.ArgumentParser(description="grid search for whole client level dp")
 parser.add_argument("--output-base-dir", default='', type=str,
                     help="output base folder.")
@@ -27,15 +29,15 @@ if __name__ == "__main__":
     model_noise_std = 0.5
     no_workers = 5
     damping = 0
-    N_dp_seeds = 30
+    N_dp_seeds = 10
     # will stop when the privacy budget is reached!
-    no_intervals = 10000
+    no_intervals = 5000
 
     dp_seeds = np.arange(1, N_dp_seeds+1)
 
-    max_eps_values = [1, 10, 100, 1000, 10000]
+    max_eps_values = [1, 100, 10000]
     dp_noise_scales = [1e-3, 1e-2, 0.1, 1, 10]
-    clipping_bounds = [1e-5, 1e-2, 1, 1e2, 1e5]
+    clipping_bounds = [1e-3, 1e-1, 1, 1e1, 1e2]
     L_values = [10, 100, 500]
 
     np.random.seed(seed)
@@ -57,7 +59,6 @@ if __name__ == "__main__":
     min_kl = 10000
     ray.init()
     for param_combination in param_combinations:
-
         print('Running for: ' + str(param_combination))
         max_eps = param_combination[0]
         dp_noise_scale = param_combination[1]
@@ -68,14 +69,17 @@ if __name__ == "__main__":
         kl_i = np.zeros(N_dp_seeds)
 
         results_objects = []
+        # hack for caching
+        log_moments = generate_log_moments(1000, 32, dp_noise_scale, L)
 
         # start everything running...
         for ind, seed in enumerate(dp_seeds):
+
             results = run_dp_analytical_pvi_sync.remote(mean, seed, max_eps, x_train, y_train,
                                                                model_noise_std,
                                                                data_func,
                                                                dp_noise_scale, no_workers, damping, no_intervals,
-                                                               clipping_bound, L, output_base_dir)
+                                                               clipping_bound, L, output_base_dir, log_moments)
             results_objects.append((results, ind))
 
         # fetch one by one

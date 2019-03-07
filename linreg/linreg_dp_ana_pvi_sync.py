@@ -36,6 +36,7 @@ parser.add_argument("--mean", default=2, type=float,
 parser.add_argument("--noise-std", default=1, type=float,
                     help="Noise Standard Deviation")
 
+
 @ray.remote
 class ParameterServer(object):
     def __init__(self, keys, values, conv_thres=0.001 * 1e-2, average_params=True):
@@ -94,7 +95,8 @@ class ParameterServer(object):
 @ray.remote
 class Worker(object):
     def __init__(
-            self, worker_index, no_workers, din, data_func, log_path, max_eps, dp_noise, c, L_in, noise_var=1, seed=0):
+            self, worker_index, no_workers, din, data_func, log_path, max_eps, dp_noise, c, L_in, noise_var=1,
+            log_moments=None, seed=0):
         np.random.seed(seed)
         tf.set_random_seed(seed)
         # get data for this worker
@@ -108,8 +110,14 @@ class Worker(object):
             din, n_train_worker, self.accountant, noise_var=noise_var, init_seed=seed,
             no_workers=no_workers, clipping_bound=c,
             dp_noise_scale=dp_noise, L=L_in)
-        # self.accountant.log_moments_increment = np.ones(32);
-        self.accountant.log_moments_increment = self.net.generate_log_moments(n_train_worker, 32)
+
+        if log_moments is None:
+            # print('calculating log moments')
+            self.accountant.log_moments_increment = self.net.generate_log_moments(n_train_worker, 32)
+        else:
+            # print('reuse log moments')
+            self.accountant.log_moments_increment = log_moments
+
         self.keys = self.net.get_params()[0]
         np.savetxt(log_path + "data/worker_{}_x.txt".format(worker_index), self.x_train)
         np.savetxt(log_path + "data/worker_{}_y.txt".format(worker_index), self.y_train)
@@ -146,7 +154,8 @@ def compute_update(keys, deltas, method='sum'):
 
 @ray.remote
 def run_dp_analytical_pvi_sync(mean, seed, max_eps, x_train, y_train, model_noise_std, data_func,
-                               dp_noise_scale, no_workers, damping, no_intervals, clipping_bound, L, output_base_dir):
+                               dp_noise_scale, no_workers, damping, no_intervals, clipping_bound, L, output_base_dir,
+                               log_moments=None):
     # update seeds
     np.random.seed(seed)
     tf.set_random_seed(seed)
@@ -173,7 +182,7 @@ def run_dp_analytical_pvi_sync(mean, seed, max_eps, x_train, y_train, model_nois
     # create workers
     workers = [
         Worker.remote(i, no_workers, in_dim, data_func, path, max_eps, dp_noise_scale, clipping_bound, L,
-                      model_noise_std ** 2, seed=seed)
+                      model_noise_std ** 2, log_moments, seed=seed)
         for i in range(no_workers)]
     i = 0
     current_params = ray.get(ps.pull.remote(all_keys))
@@ -275,6 +284,7 @@ if __name__ == "__main__":
     max_eps = np.inf
     noise_scale = 0.0001
     c = 10000
-    ray.get(run_dp_analytical_pvi_sync.remote(mean_args, seed_args, max_eps, x_train, y_train, noise_std_args, data_func,
-                               noise_scale, no_workers_args, damping_args, no_intervals_args,
-                               c, L))
+    ray.get(
+        run_dp_analytical_pvi_sync.remote(mean_args, seed_args, max_eps, x_train, y_train, noise_std_args, data_func,
+                                          noise_scale, no_workers_args, damping_args, no_intervals_args,
+                                          c, L))

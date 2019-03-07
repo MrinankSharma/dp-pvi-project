@@ -161,7 +161,8 @@ def compute_update(keys, deltas, clipping_bound, noise_scale, method='sum'):
 
 @ray.remote
 def run_global_dp_analytical_pvi_sync(redis_address, mean, seed, max_eps, x_train, y_train, model_noise_std, data_func,
-                                      dp_noise_scale, no_workers, damping, no_intervals, clipping_bound, output_base_dir):
+                                      dp_noise_scale, no_workers, damping, no_intervals, clipping_bound,
+                                      output_base_dir, log_moments=None):
     np.random.seed(seed)
     tf.set_random_seed(seed)
     np.random.seed(seed)
@@ -176,15 +177,19 @@ def run_global_dp_analytical_pvi_sync(redis_address, mean, seed, max_eps, x_trai
     _, _, exact_mean_pres, exact_pres = exact_inference(x_train, y_train, net.prior_var_num, model_noise_std ** 2)
     print("Exact Inference Params: {}, {}".format(exact_mean_pres, exact_pres))
 
-    # accountant is not important here...
-    print('calculating log moments')
-    accountant.log_moments_increment = generate_log_moments(no_workers, 32, dp_noise_scale, no_workers)
+    if log_moments is None:
+        # accountant is not important here...
+        print('calculating log moments')
+        accountant.log_moments_increment = generate_log_moments(no_workers, 32, dp_noise_scale, no_workers)
+    else:
+        print('reusing log moments')
+        accountant.log_moments_increment = log_moments
     # accountant.log_moments_increment = net.generate_log_moments(n_train_master, 32)
     all_keys, all_values = net.get_params()
     ps = ParameterServer.remote(all_keys, all_values)
 
     timestr = time.strftime("%m-%d;%H:%M:%S")
-    timestr = timestr + "-s-"+str(seed)
+    timestr = timestr + "-s-" + str(seed)
     path = output_base_dir
     path = path + 'logs/global_dp_analytical_sync_pvi/' + timestr + '/'
     os.makedirs(path + "data/")

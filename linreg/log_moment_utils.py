@@ -2,6 +2,8 @@ import tensorflow as tf
 import numpy as np
 import math
 
+from repoze.lru import lru_cache
+
 float_type = tf.float32
 int_type = tf.int32
 
@@ -25,13 +27,18 @@ def get_I1_I2_lambda(lambda_val, pdf1, pdf2):
     I2_func = lambda x: pdf2(x) * (pdf2(x) / pdf1(x)) ** lambda_val
     return I1_func, I2_func
 
+
 def integral_inf_mp(fn):
     integral, _ = mp.quad(fn, [-mp.inf, mp.inf], error=True)
     return integral
 
+
 def generate_log_moments(N, max_lambda, noise_scale, lot_size):
+    # print('generating log moments')
     L = lot_size
-    q = 1.0* L / N
+    q = 1.0 * L / N
+
+    # these moments are a function of q, noise_scale and max_lambda
 
     # generate pdfs which are to be integrated numerically
     pdf1 = lambda x: pdf_gauss(x, noise_scale, mp.mpf(0))
@@ -53,5 +60,3 @@ def generate_log_moments(N, max_lambda, noise_scale, lot_size):
             alpha_M_lambda[lambda_val - 1] = to_np_float_64(mp.log(I2_val))
 
     return alpha_M_lambda
-
-
