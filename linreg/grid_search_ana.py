@@ -27,11 +27,11 @@ if __name__ == "__main__":
     model_noise_std = 0.5
     no_workers = 5
     damping = 0
-    N_dp_seeds = 50
+    N_dp_seeds = 2
     # will stop when the privacy budget is reached!
     no_intervals = 10000
 
-    dp_seeds = np.arange(1, N_dp_seeds)
+    dp_seeds = np.arange(1, N_dp_seeds+1)
 
     max_eps_values = [1, 10, 100, 1000, 10000]
     dp_noise_scales = [1e-3, 1e-2, 0.1, 1, 10]
@@ -67,9 +67,21 @@ if __name__ == "__main__":
         eps_i = np.zeros(N_dp_seeds)
         kl_i = np.zeros(N_dp_seeds)
 
+        results_objects = []
+
+        # start everything running...
         for ind, seed in enumerate(dp_seeds):
-            results = ray.get(run_dp_analytical_pvi_sync.remote(mean, seed, max_eps, x_train, y_train, model_noise_std, data_func,
-                                                 dp_noise_scale, no_workers, damping, no_intervals, clipping_bound, L, output_base_dir))
+            results = run_dp_analytical_pvi_sync.remote(mean, seed, max_eps, x_train, y_train,
+                                                               model_noise_std,
+                                                               data_func,
+                                                               dp_noise_scale, no_workers, damping, no_intervals,
+                                                               clipping_bound, L, output_base_dir)
+            results_objects.append((results, ind))
+
+        # fetch one by one
+        for results_tup in results_objects:
+            [results_obj, ind] = results_tup
+            results = ray.get(results_obj)
             eps = results[0]
             kl = results[1]
             eps_i[ind] = eps
@@ -85,6 +97,8 @@ if __name__ == "__main__":
             print(param_combination)
             min_kl = kl
 
+        print(log_file)
+        print('logging!')
         text_file = open(log_file, "a")
         text_file.write(
             "max eps: {} eps: {} eps_var: {:.4e} dp_noise: {} c: {} kl: {} kl_var: {:.4e}  L:{}\n".format(max_eps, eps,
