@@ -1,5 +1,6 @@
 import numpy as np
 import tensorflow as tf
+import traceback
 
 import argparse
 
@@ -87,64 +88,71 @@ if __name__ == "__main__":
 
     experiment_counter = 0
     for param_combination in param_combinations:
-        if param_combination in searched_params:
-            experiment_counter += 1
-            # skip, but dont resave...
+        try:
+            if param_combination in searched_params:
+                experiment_counter += 1
+                # skip, but dont resave...
+                print('Skipping: ' + str(param_combination))
+                continue
+            print('Running for: ' + str(param_combination))
+            max_eps = param_combination[0]
+            dp_noise_scale = param_combination[1]
+            clipping_bound = param_combination[2]
+            L = param_combination[3]
+
+            eps_i = np.zeros(N_dp_seeds)
+            kl_i = np.zeros(N_dp_seeds)
+
+            results_objects = []
+            # hack for caching
+            log_moments = generate_log_moments(1000, 32, dp_noise_scale, L)
+
+            # start everything running...
+            for ind, seed in enumerate(dp_seeds):
+                results = run_dp_analytical_pvi_sync.remote(mean, seed, max_eps, x_train, y_train,
+                                                            model_noise_std,
+                                                            data_func,
+                                                            dp_noise_scale, no_workers, damping, no_intervals,
+                                                            clipping_bound, L, output_base_dir, log_moments)
+                results_objects.append((results, ind))
+
+            # fetch one by one
+            for results_tup in results_objects:
+                [results_obj, ind] = results_tup
+                results = ray.get(results_obj)
+                eps = results[0]
+                kl = results[1]
+                eps_i[ind] = eps
+                kl_i[ind] = kl
+
+            eps = np.mean(eps_i)
+            kl = np.mean(kl_i)
+            eps_var = np.var(eps_i)
+            kl_var = np.var(kl_i)
+
+            if kl < min_kl:
+                print('New Min KL: {}'.format(kl))
+                print(param_combination)
+                min_kl = kl
+
+            # print(log_file)
+            # print('logging!')
+            text_file = open(log_file_path, "a")
+            text_file.write(
+                "max_eps: {} eps: {} eps_var: {:.4e} dp_noise: {} c: {} kl: {} kl_var: {:.4e}  L:{}\n".format(max_eps, eps,
+                                                                                                              eps_var,
+                                                                                                              dp_noise_scale,
+                                                                                                              clipping_bound,
+                                                                                                              kl, kl_var,
+                                                                                                              L))
+            text_file.close()
+            csv_file = open(csv_file_path, "a")
+            csv_file.write(
+                "{},{},{:.4e},{},{},{},{:.4e},{}\n".format(max_eps, eps, eps_var, dp_noise_scale, clipping_bound, kl,
+                                                           kl_var, L))
+            csv_file.close()
+        except Exception, e:
+            traceback.print_exc()
             continue
-        print('Running for: ' + str(param_combination))
-        max_eps = param_combination[0]
-        dp_noise_scale = param_combination[1]
-        clipping_bound = param_combination[2]
-        L = param_combination[3]
 
-        eps_i = np.zeros(N_dp_seeds)
-        kl_i = np.zeros(N_dp_seeds)
 
-        results_objects = []
-        # hack for caching
-        log_moments = generate_log_moments(1000, 32, dp_noise_scale, L)
-
-        # start everything running...
-        for ind, seed in enumerate(dp_seeds):
-            results = run_dp_analytical_pvi_sync.remote(mean, seed, max_eps, x_train, y_train,
-                                                        model_noise_std,
-                                                        data_func,
-                                                        dp_noise_scale, no_workers, damping, no_intervals,
-                                                        clipping_bound, L, output_base_dir, log_moments)
-            results_objects.append((results, ind))
-
-        # fetch one by one
-        for results_tup in results_objects:
-            [results_obj, ind] = results_tup
-            results = ray.get(results_obj)
-            eps = results[0]
-            kl = results[1]
-            eps_i[ind] = eps
-            kl_i[ind] = kl
-
-        eps = np.mean(eps_i)
-        kl = np.mean(kl_i)
-        eps_var = np.var(eps_i)
-        kl_var = np.var(kl_i)
-
-        if kl < min_kl:
-            print('New Min KL: {}'.format(kl))
-            print(param_combination)
-            min_kl = kl
-
-        # print(log_file)
-        # print('logging!')
-        text_file = open(log_file_path, "a")
-        text_file.write(
-            "max_eps: {} eps: {} eps_var: {:.4e} dp_noise: {} c: {} kl: {} kl_var: {:.4e}  L:{}\n".format(max_eps, eps,
-                                                                                                          eps_var,
-                                                                                                          dp_noise_scale,
-                                                                                                          clipping_bound,
-                                                                                                          kl, kl_var,
-                                                                                                          L))
-        text_file.close()
-        csv_file = open(csv_file_path, "a")
-        csv_file.write(
-            "{},{},{:.4e},{},{},{},{:.4e},{}\n".format(max_eps, eps, eps_var, dp_noise_scale, clipping_bound, kl,
-                                                       kl_var, L))
-        csv_file.close()
