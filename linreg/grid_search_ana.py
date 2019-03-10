@@ -20,8 +20,6 @@ parser.add_argument("--output-base-dir", default='', type=str,
 parser.add_argument("--tag", default='default', type=str)
 parser.add_argument("--overwrite", dest='overwrite', action='store_true')
 
-
-
 if __name__ == "__main__":
     args = parser.parse_args()
     output_base_dir = args.output_base_dir
@@ -110,7 +108,7 @@ if __name__ == "__main__":
                                                             model_noise_std,
                                                             data_func,
                                                             dp_noise_scale, no_workers, damping, no_intervals,
-                                                            clipping_bound, L, output_base_dir,log_moments)
+                                                            clipping_bound, L, output_base_dir, log_moments)
                 results_objects.append((results, ind))
 
             # fetch one by one
@@ -123,7 +121,7 @@ if __name__ == "__main__":
                 kl_i[ind] = kl
                 # save the tracker_array
                 tracker_array = results[2]
-                fname = path+'e{}s{}.csv'.format(experiment_counter, ind)
+                fname = path + 'e{}s{}.csv'.format(experiment_counter, ind)
                 np.savetxt(fname, tracker_array, delimiter=',')
 
             eps = np.mean(eps_i)
@@ -140,20 +138,24 @@ if __name__ == "__main__":
             # print('logging!')
             text_file = open(log_file_path, "a")
             text_file.write(
-                "max_eps: {} eps: {} eps_var: {:.4e} dp_noise: {} c: {} kl: {} kl_var: {:.4e}  L:{}\n".format(max_eps, eps,
-                                                                                                              eps_var,
-                                                                                                              dp_noise_scale,
-                                                                                                              clipping_bound,
-                                                                                                              kl, kl_var,
-                                                                                                              L))
+                "max_eps: {} eps: {} eps_var: {:.4e} dp_noise: {} c: {} kl: {} kl_var: {:.4e} experiment_counter:{} L:{}\n".format(
+                    max_eps,
+                    eps,
+                    eps_var,
+                    dp_noise_scale,
+                    clipping_bound,
+                    kl,
+                    kl_var,
+                    experiment_counter,
+                    L))
             text_file.close()
             csv_file = open(csv_file_path, "a")
             csv_file.write(
-                "{},{},{:.4e},{},{},{},{:.4e},{}\n".format(max_eps, eps, eps_var, dp_noise_scale, clipping_bound, kl,
-                                                           kl_var, L))
+                "{},{},{:.4e},{},{},{},{:.4e},{},{}\n".format(max_eps, eps, eps_var, dp_noise_scale, clipping_bound,
+                                                              kl,
+                                                              kl_var, experiment_counter, L))
             csv_file.close()
+            experiment_counter += 1
         except Exception, e:
             traceback.print_exc()
             continue
-
-

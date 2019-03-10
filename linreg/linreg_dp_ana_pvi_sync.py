@@ -217,7 +217,7 @@ def run_dp_analytical_pvi_sync(mean, seed, max_eps, x_train, y_train, model_nois
                 current_params, damping=damping)
             for worker in workers]
         sum_delta = compute_update(all_keys, ray.get(deltas))
-        mean_delta = [i/N_train_worker for i in sum_delta]
+        mean_delta = [i / N_train_worker for i in sum_delta]
         current_eps = ray.get(workers[0].get_privacy_spent.remote())
         ps.push.remote(all_keys, sum_delta)
         current_params = ray.get(ps.pull.remote(all_keys))

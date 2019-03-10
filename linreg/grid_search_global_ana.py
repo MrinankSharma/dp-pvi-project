@@ -37,7 +37,7 @@ if __name__ == "__main__":
     no_intervals = 5000
     N_dp_seeds = 10
 
-    dp_seeds = np.arange(1, N_dp_seeds+1)
+    dp_seeds = np.arange(1, N_dp_seeds + 1)
 
     max_eps_values = [1, 10, 100]
     dp_noise_scales = [1e-3, 1e-2, 0.1, 1, 10]
@@ -71,11 +71,10 @@ if __name__ == "__main__":
             # do not duplicate experiments
             searched_params = get_params_from_csv(csv_file_path)
 
-
     min_kl = 10000
     ray.init()
 
-    experiment_counter = 0
+    experiment_counter = 1
     for param_combination in param_combinations:
         try:
             if param_combination in searched_params:
@@ -100,10 +99,11 @@ if __name__ == "__main__":
             for ind, seed in enumerate(dp_seeds):
                 # hack to cache results
 
-                results = run_global_dp_analytical_pvi_sync.remote(None, mean, seed, max_eps, x_train, y_train, model_noise_std,
-                                                            data_func,
-                                                            dp_noise_scale, no_workers, damping, no_intervals,
-                                                            clipping_bound, output_base_dir, log_moments)
+                results = run_global_dp_analytical_pvi_sync.remote(None, mean, seed, max_eps, x_train, y_train,
+                                                                   model_noise_std,
+                                                                   data_func,
+                                                                   dp_noise_scale, no_workers, damping, no_intervals,
+                                                                   clipping_bound, output_base_dir, log_moments)
                 results_objects.append((results, ind))
 
             # fetch one by one
@@ -132,18 +132,18 @@ if __name__ == "__main__":
 
             text_file = open(log_file_path, "a")
             text_file.write(
-                "max eps: {} eps: {} eps_var: {:.4e} dp_noise: {} c: {} kl: {} kl_var: {:.4e}\n".format(max_eps, eps,
-                                                                                                              eps_var,
-                                                                                                              dp_noise_scale,
-                                                                                                              clipping_bound,
-                                                                                                              kl, kl_var))
+                "max eps: {} eps: {} eps_var: {:.4e} dp_noise: {} c: {} kl: {} kl_var: {:.4e} experiment_counter: {}\n".format(max_eps, eps,
+                                                                                                        eps_var,
+                                                                                                        dp_noise_scale,
+                                                                                                        clipping_bound,
+                                                                                                        kl, kl_var, experiment_counter))
             text_file.close()
             csv_file = open(csv_file_path, "a")
             csv_file.write(
-                "{},{},{:.4e},{},{},{},{:.4e}\n".format(max_eps, eps, eps_var, dp_noise_scale, clipping_bound, kl,
-                                                           kl_var))
+                "{},{},{:.4e},{},{},{},{:.4e},{}\n".format(max_eps, eps, eps_var, dp_noise_scale, clipping_bound, kl,
+                                                        kl_var, experiment_counter))
             csv_file.close()
+            experiment_counter += 1
         except Exception, e:
             traceback.print_exc()
             continue
-
