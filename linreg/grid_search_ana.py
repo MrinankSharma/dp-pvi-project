@@ -65,7 +65,7 @@ if __name__ == "__main__":
 
     timestr = time.strftime("%m-%d;%H:%M:%S")
     path = output_base_dir
-    path = output_base_dir + 'logs/gs_local_linreg_dp_ana/' + tag + '/'
+    path = output_base_dir + 'logs/gs_local_ana/' + tag + '/'
     os.makedirs(path)
     log_file_path = path + 'results.txt'
     csv_file_path = path + 'results.csv'
@@ -81,10 +81,8 @@ if __name__ == "__main__":
             # do not duplicate experiments
             searched_params = get_params_from_csv(csv_file_path)
 
-
     min_kl = 10000
     ray.init()
-
 
     experiment_counter = 0
     for param_combination in param_combinations:
@@ -104,7 +102,6 @@ if __name__ == "__main__":
             kl_i = np.zeros(N_dp_seeds)
 
             results_objects = []
-            # hack for caching
             log_moments = generate_log_moments(1000, 32, dp_noise_scale, L)
 
             # start everything running...
@@ -113,7 +110,7 @@ if __name__ == "__main__":
                                                             model_noise_std,
                                                             data_func,
                                                             dp_noise_scale, no_workers, damping, no_intervals,
-                                                            clipping_bound, L, output_base_dir, log_moments)
+                                                            clipping_bound, L, output_base_dir,log_moments)
                 results_objects.append((results, ind))
 
             # fetch one by one
@@ -124,6 +121,10 @@ if __name__ == "__main__":
                 kl = results[1]
                 eps_i[ind] = eps
                 kl_i[ind] = kl
+                # save the tracker_array
+                tracker_array = results[2]
+                fname = path+'e{}s{}.csv'.format(experiment_counter, ind)
+                np.savetxt(fname, tracker_array, delimiter=',')
 
             eps = np.mean(eps_i)
             kl = np.mean(kl_i)

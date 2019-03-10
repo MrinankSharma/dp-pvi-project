@@ -55,7 +55,7 @@ if __name__ == "__main__":
     param_combinations = list(itertools.product(max_eps_values, dp_noise_scales, clipping_bounds))
     timestr = time.strftime("%m-%d;%H:%M:%S")
     path = output_base_dir
-    path = path + 'logs/gs_client_linreg_dp/' + tag + '/'
+    path = path + 'logs/gs_global_ana/' + tag + '/'
     os.makedirs(path)
     log_file_path = path + 'results.txt'
     csv_file_path = path + 'results.csv'
@@ -81,6 +81,7 @@ if __name__ == "__main__":
             if param_combination in searched_params:
                 experiment_counter += 1
                 # skip, but dont resave...
+                print('Skipping: ' + str(param_combination))
                 continue
             print('Running for: ' + str(param_combination))
             max_eps = param_combination[0]
@@ -113,6 +114,9 @@ if __name__ == "__main__":
                 kl = results[1]
                 eps_i[ind] = eps
                 kl_i[ind] = kl
+                tracker_array = results[2]
+                fname = path + 'e{}s{}.csv'.format(experiment_counter, ind)
+                np.savetxt(fname, tracker_array, delimiter=',')
 
             eps = np.mean(eps_i)
             kl = np.mean(kl_i)

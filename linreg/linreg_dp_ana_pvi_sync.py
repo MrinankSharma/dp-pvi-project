@@ -14,7 +14,7 @@ import linreg.linreg_models as linreg_models
 import linreg.data as data
 import tensorflow as tf
 from linreg.moments_accountant import MomentsAccountantPolicy, MomentsAccountant
-from linreg.inference_utils import save_predictive_plot, exact_inference, KL_Gaussians
+from linreg.inference_utils import exact_inference, KL_Gaussians
 
 parser = argparse.ArgumentParser(description="synchronous distributed variational training.")
 parser.add_argument("--data", default='toy_1d', type=str,
@@ -169,7 +169,7 @@ def run_dp_analytical_pvi_sync(mean, seed, max_eps, x_train, y_train, model_nois
     print("Exact Inference Params: {}, {}".format(exact_mean_pres, exact_pres))
 
     # accountant is not important here...
-    accountant.log_moments_increment = np.ones(32);
+    accountant.log_moments_increment = np.ones(32)
     # accountant.log_moments_increment = net.generate_log_moments(n_train_master, 32)
     all_keys, all_values = net.get_params()
     ps = ParameterServer.remote(all_keys, all_values)
@@ -209,18 +209,25 @@ def run_dp_analytical_pvi_sync(mean, seed, max_eps, x_train, y_train, model_nois
     text_file.close()
 
     tracker_file = path + 'params.txt'
+    tracker_vals = []
 
     while i < no_intervals:
         deltas = [
             worker.get_delta.remote(
                 current_params, damping=damping)
             for worker in workers]
-        mean_delta = compute_update(all_keys, ray.get(deltas))
-        ps.push.remote(all_keys, mean_delta)
+        sum_delta = compute_update(all_keys, ray.get(deltas))
+        mean_delta = [i/N_train_worker for i in sum_delta]
+        current_eps = ray.get(workers[0].get_privacy_spent.remote())
+        ps.push.remote(all_keys, sum_delta)
         current_params = ray.get(ps.pull.remote(all_keys))
         print("Interval {} done".format(i))
         i += 1
         print(current_params)
+
+        KL_loss = KL_Gaussians(current_params[0], current_params[1], exact_mean_pres, exact_pres)
+        tracker_i = [mean_delta[0], mean_delta[1], current_params[0], current_params[1], KL_loss, current_eps]
+        tracker_vals.append(tracker_i)
 
         # save to file, tracking stuff
         with open(tracker_file, 'a') as file:
@@ -245,7 +252,8 @@ def run_dp_analytical_pvi_sync(mean, seed, max_eps, x_train, y_train, model_nois
     # compute KL(q||p)
     KL_loss = KL_Gaussians(current_params[0], current_params[1], exact_mean_pres, exact_pres)
     print(KL_loss)
-    return eps, KL_loss
+    tracker_array = np.array(tracker_vals)
+    return eps, KL_loss, tracker_array
 
 
 if __name__ == "__main__":

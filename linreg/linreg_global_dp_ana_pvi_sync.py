@@ -221,16 +221,22 @@ def run_global_dp_analytical_pvi_sync(redis_address, mean, seed, max_eps, x_trai
     text_file.close()
 
     tracker_file = path + 'params.txt'
+    tracker_vals = []
 
     while i < no_intervals:
         deltas = [
             worker.get_delta.remote(
                 current_params, damping=damping)
             for worker in workers]
-        mean_delta = compute_update(all_keys, ray.get(deltas), clipping_bound, dp_noise_scale)
+        sum_delta = compute_update(all_keys, ray.get(deltas), clipping_bound, dp_noise_scale)
         should_stop_priv = accountant.update_privacy_budget()
-        ps.push.remote(all_keys, mean_delta)
+        mean_delta = [i / N_train_worker for i in sum_delta]
+        current_eps = ray.get(workers[0].get_privacy_spent.remote())
+        ps.push.remote(all_keys, sum_delta)
         current_params = ray.get(ps.pull.remote(all_keys))
+        KL_loss = KL_Gaussians(current_params[0], current_params[1], exact_mean_pres, exact_pres)
+        tracker_i = [mean_delta[0], mean_delta[1], current_params[0], current_params[1], KL_loss, current_eps]
+        tracker_vals.append(tracker_i)
         print("Interval {} done".format(i))
         i += 1
         print(current_params)
@@ -261,7 +267,8 @@ def run_global_dp_analytical_pvi_sync(redis_address, mean, seed, max_eps, x_trai
     print(plot_title)
     print(KL_loss)
 
-    return eps, KL_loss
+    tracker_array = np.array(tracker_vals)
+    return eps, KL_loss, tracker_array
 
 
 if __name__ == "__main__":
