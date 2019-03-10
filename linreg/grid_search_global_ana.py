@@ -6,6 +6,7 @@ import argparse
 import linreg.data as data
 from linreg_global_dp_ana_pvi_sync import run_global_dp_analytical_pvi_sync
 from log_moment_utils import generate_log_moments
+from linreg.file_utils import get_params_from_csv
 import itertools
 import time
 import os
@@ -14,11 +15,14 @@ import ray
 parser = argparse.ArgumentParser(description="grid search for whole client level dp")
 parser.add_argument("--output-base-dir", default='', type=str,
                     help="output base folder.")
+parser.add_argument("--tag", default='default', type=str)
+parser.add_argument("--overwrite", dest='overwrite', action='store_true')
 
 if __name__ == "__main__":
     args = parser.parse_args()
     output_base_dir = args.output_base_dir
-    print(output_base_dir)
+    should_overwrite = args.overwrite
+    tag = args.tag
 
     # really, we should average over multiple seeds
     seed = 42
@@ -50,13 +54,31 @@ if __name__ == "__main__":
     param_combinations = list(itertools.product(max_eps_values, dp_noise_scales, clipping_bounds))
     timestr = time.strftime("%m-%d;%H:%M:%S")
     path = output_base_dir
-    path = path + 'logs/gs_client_linreg_dp/' + timestr + '/'
+    path = path + 'logs/gs_client_linreg_dp/' + tag + '/'
     os.makedirs(path)
-    log_file = path + 'results.txt'
+    log_file_path = path + 'results.txt'
     csv_file_path = path + 'results.csv'
+
+    searched_params = []
+    # if some results have already been processed with this tag
+    if os.path.exists(csv_file_path):
+        # if overwriting, delete the results files
+        if should_overwrite:
+            os.remove(csv_file_path)
+            os.remove(log_file_path)
+        else:
+            # do not duplicate experiments
+            searched_params = get_params_from_csv(csv_file_path)
+
+
     min_kl = 10000
     ray.init()
+    experiment_counter = 0
     for param_combination in param_combinations:
+        if param_combination in searched_params:
+            experiment_counter += 1
+            # skip, but dont resave...
+            continue
         print('Running for: ' + str(param_combination))
         max_eps = param_combination[0]
         dp_noise_scale = param_combination[1]

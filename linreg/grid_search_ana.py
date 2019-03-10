@@ -5,6 +5,7 @@ import argparse
 
 import linreg.data as data
 from linreg.linreg_dp_ana_pvi_sync import run_dp_analytical_pvi_sync
+from linreg.file_utils import get_params_from_csv
 import itertools
 import time
 import os
@@ -15,11 +16,16 @@ from linreg.log_moment_utils import generate_log_moments
 parser = argparse.ArgumentParser(description="grid search for whole client level dp")
 parser.add_argument("--output-base-dir", default='', type=str,
                     help="output base folder.")
+parser.add_argument("--tag", default='default', type=str)
+parser.add_argument("--overwrite", dest='overwrite', action='store_true')
+
+
 
 if __name__ == "__main__":
     args = parser.parse_args()
     output_base_dir = args.output_base_dir
-    print(output_base_dir)
+    should_overwrite = args.overwrite
+    tag = args.tag
 
     # really, we should average over multiple seeds
     seed = 42
@@ -38,7 +44,12 @@ if __name__ == "__main__":
     max_eps_values = [1, 100, 10000]
     dp_noise_scales = [1e-3, 1e-2, 0.1, 1, 10]
     clipping_bounds = [1e-3, 1e-1, 1, 1e1, 1e2]
-    L_values = [10, 100, 500]
+    L_values = [1000]
+
+    max_eps_values = [100]
+    dp_noise_scales = [10]
+    clipping_bounds = [1]
+    L_values = [100]
 
     np.random.seed(seed)
     tf.set_random_seed(seed)
@@ -53,13 +64,33 @@ if __name__ == "__main__":
 
     timestr = time.strftime("%m-%d;%H:%M:%S")
     path = output_base_dir
-    path = output_base_dir + 'logs/gs_local_linreg_dp_ana/' + timestr + '/'
+    path = output_base_dir + 'logs/gs_local_linreg_dp_ana/' + tag + '/'
     os.makedirs(path)
-    log_file = path + 'results.txt'
+    log_file_path = path + 'results.txt'
     csv_file_path = path + 'results.csv'
+
+    searched_params = []
+    # if some results have already been processed with this tag
+    if os.path.exists(csv_file_path):
+        # if overwriting, delete the results files
+        if should_overwrite:
+            os.remove(csv_file_path)
+            os.remove(log_file_path)
+        else:
+            # do not duplicate experiments
+            searched_params = get_params_from_csv(csv_file_path)
+
+
     min_kl = 10000
     ray.init()
+
+
+    experiment_counter = 0
     for param_combination in param_combinations:
+        if param_combination in searched_params:
+            experiment_counter += 1
+            # skip, but dont resave...
+            continue
         print('Running for: ' + str(param_combination))
         max_eps = param_combination[0]
         dp_noise_scale = param_combination[1]
@@ -103,7 +134,7 @@ if __name__ == "__main__":
 
         # print(log_file)
         # print('logging!')
-        text_file = open(log_file, "a")
+        text_file = open(log_file_path, "a")
         text_file.write(
             "max_eps: {} eps: {} eps_var: {:.4e} dp_noise: {} c: {} kl: {} kl_var: {:.4e}  L:{}\n".format(max_eps, eps,
                                                                                                           eps_var,

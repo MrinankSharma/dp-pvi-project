@@ -154,7 +154,7 @@ def compute_update(keys, deltas, method='sum'):
 
 @ray.remote
 def run_dp_analytical_pvi_sync(mean, seed, max_eps, x_train, y_train, model_noise_std, data_func,
-                               dp_noise_scale, no_workers, damping, no_intervals, clipping_bound, L, output_base_dir,
+                               dp_noise_scale, no_workers, damping, no_intervals, clipping_bound, L, output_base_dir='',
                                log_moments=None):
     # update seeds
     np.random.seed(seed)
@@ -242,7 +242,8 @@ def run_dp_analytical_pvi_sync(mean, seed, max_eps, x_train, y_train, model_nois
     # save_predictive_plot(path + 'pred.png', x_train, y_train, mean, var, model_noise_std**2, plot_title)
     # report the privacy cost and plot onto the graph...
     print(plot_title)
-    KL_loss = KL_Gaussians(exact_mean_pres, exact_pres, current_params[0], current_params[1])
+    # compute KL(q||p)
+    KL_loss = KL_Gaussians(current_params[0], current_params[1], exact_mean_pres, exact_pres)
     print(KL_loss)
     return eps, KL_loss
 
@@ -279,10 +280,10 @@ if __name__ == "__main__":
 
     # Create a parameter server with some random params.
     x_train, y_train, x_test, y_test = data_func(0, 1)
-    L = 1000
+    L = 10
 
     max_eps = np.inf
-    noise_scale = 0.0001
+    noise_scale = 0.0000001
     c = 10000
     ray.get(
         run_dp_analytical_pvi_sync.remote(mean_args, seed_args, max_eps, x_train, y_train, noise_std_args, data_func,
