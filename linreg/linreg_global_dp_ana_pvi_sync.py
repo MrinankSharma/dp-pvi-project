@@ -230,8 +230,8 @@ def run_global_dp_analytical_pvi_sync(redis_address, mean, seed, max_eps, x_trai
             for worker in workers]
         sum_delta = compute_update(all_keys, ray.get(deltas), clipping_bound, dp_noise_scale)
         should_stop_priv = accountant.update_privacy_budget()
-        mean_delta = [i / N_train_worker for i in sum_delta]
-        current_eps = ray.get(workers[0].get_privacy_spent.remote())
+        mean_delta = [j / N_train_worker for j in sum_delta]
+        current_eps = accountant.current_tracked_val
         ps.push.remote(all_keys, sum_delta)
         current_params = ray.get(ps.pull.remote(all_keys))
         KL_loss = KL_Gaussians(current_params[0], current_params[1], exact_mean_pres, exact_pres)

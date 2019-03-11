@@ -37,8 +37,6 @@ if __name__ == "__main__":
     no_intervals = 5000
     N_dp_seeds = 10
 
-    dp_seeds = np.arange(1, N_dp_seeds + 1)
-
     max_eps_values = [1, 10, 100]
     dp_noise_scales = [1e-3, 1e-2, 0.1, 1, 10]
     clipping_bounds = [1e-3, 1e-1, 1, 1e1, 1e2]
@@ -56,7 +54,10 @@ if __name__ == "__main__":
     timestr = time.strftime("%m-%d;%H:%M:%S")
     path = output_base_dir
     path = path + 'logs/gs_global_ana/' + tag + '/'
-    os.makedirs(path)
+    try:
+        os.makedirs(path)
+    except OSError:
+        print('Duplicate tag being used')
     log_file_path = path + 'results.txt'
     csv_file_path = path + 'results.csv'
 
@@ -73,6 +74,8 @@ if __name__ == "__main__":
 
     min_kl = 10000
     ray.init()
+
+    dp_seeds = np.arange(1, N_dp_seeds + 1)
 
     experiment_counter = 1
     for param_combination in param_combinations:

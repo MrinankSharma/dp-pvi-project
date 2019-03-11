@@ -38,17 +38,10 @@ if __name__ == "__main__":
     # will stop when the privacy budget is reached!
     no_intervals = 5000
 
-    dp_seeds = np.arange(1, N_dp_seeds + 1)
-
     max_eps_values = [1, 100, 10000]
     dp_noise_scales = [1e-3, 1e-2, 0.1, 1, 10]
     clipping_bounds = [1e-3, 1e-1, 1, 1e1, 1e2]
     L_values = [1000]
-
-    max_eps_values = [100]
-    dp_noise_scales = [10]
-    clipping_bounds = [1]
-    L_values = [100]
 
     np.random.seed(seed)
     tf.set_random_seed(seed)
@@ -64,9 +57,14 @@ if __name__ == "__main__":
     timestr = time.strftime("%m-%d;%H:%M:%S")
     path = output_base_dir
     path = output_base_dir + 'logs/gs_local_ana/' + tag + '/'
-    os.makedirs(path)
+    try:
+        os.makedirs(path)
+    except OSError:
+        print('Duplicate tag being used')
     log_file_path = path + 'results.txt'
     csv_file_path = path + 'results.csv'
+
+    dp_seeds = np.arange(1, N_dp_seeds + 1)
 
     searched_params = []
     # if some results have already been processed with this tag
