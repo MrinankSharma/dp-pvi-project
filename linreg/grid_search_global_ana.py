@@ -18,11 +18,14 @@ parser.add_argument("--output-base-dir", default='', type=str,
                     help="output base folder.")
 parser.add_argument("--tag", default='default', type=str)
 parser.add_argument("--overwrite", dest='overwrite', action='store_true')
+parser.add_argument("--testing", dest='testing', action='store_true')
+
 
 if __name__ == "__main__":
     args = parser.parse_args()
     output_base_dir = args.output_base_dir
     should_overwrite = args.overwrite
+    testing = args.testing
     tag = args.tag
 
     # really, we should average over multiple seeds
@@ -40,6 +43,15 @@ if __name__ == "__main__":
     max_eps_values = [1, 10, 100]
     dp_noise_scales = [1e-3, 1e-2, 0.1, 1, 10]
     clipping_bounds = [1e-3, 1e-1, 1, 1e1, 1e2]
+
+    if testing:
+        max_eps_values = [1]
+        dp_noise_scales = [1e-3]
+        clipping_bounds = [1e-3]
+        L_values = [1000]
+        N_dp_seeds = 4
+        tag = 'testing'
+        should_overwrite = True
 
     np.random.seed(seed)
     tf.set_random_seed(seed)
@@ -126,8 +138,6 @@ if __name__ == "__main__":
             eps_var = np.var(eps_i)
             kl_var = np.var(kl_i)
 
-            eps = results[0]
-            kl = results[1]
             if kl < min_kl:
                 print('New Min KL: {}'.format(kl))
                 print(param_combination)
