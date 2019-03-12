@@ -2,16 +2,18 @@
 % exact parameters
 % function plotResultsFile(filename)
     filename = '/Users/msharma/workspace/IIB/dp-pvi-project/linreg/logs/gs_global_ana/default/results.csv';
-    exp_folder = '/Users/msharma/workspace/IIB/dp-pvi-project/linreg/logs/gs_global_ana/default/';
+    exp_folder = '/Users/msharma/workspace/IIB/dp-pvi-project/remote-results/gs_local_ana/gs_local_ana/inf_private_2/';
     
-    exp_folder = '/Users/msharma/workspace/IIB/dp-pvi-project/remote-results/gs_local_ana/first_pass/'
+%     exp_folder = '/Users/msharma/workspace/IIB/dp-pvi-project/remote-results/gs_global_ana/inf_private/'
 %     exp_folder = '/Users/msharma/workspace/IIB/dp-pvi-project/remote-results/gs_global_ana/first_pass/'
 
 
-    filename = strcat(exp_folder, 'results.csv')
+    filename = strcat(exp_folder, 'results.csv');
     results_mat = csvread(filename);
 %     max eps: 1 eps: 2 eps_var: 3 dp_noise: 4 c: 5 kl: 6 kl_var: 7
 %     experiment_counter: 8 ignore L for the time being
+    results_mat = results_mat(~any(isnan(results_mat(2:end, :)), 2), :);
+    
     eps_vals = results_mat(:, 2);
     kl_vals = results_mat(:, 6);
     c_vals = results_mat(:, 5);
@@ -19,7 +21,7 @@
     counter_vals = results_mat(:, 8);
     
     f = figure('pos', [10 10 1200 800]);
-    scatter(eps_vals, kl_vals, 100*log10(noise_vals*10^5), log10(c_vals), 'o', 'filled');
+    scatter(eps_vals, kl_vals, 100*log10(noise_vals*10^8), log10(c_vals), 'o', 'filled');
     
     colormap parula
     c = colorbar;
@@ -28,7 +30,7 @@
     set(gca,'yscale','log')
     ylabel('$\mathcal{KL}(q(\theta)||p(\theta| \mathcal{D}))$')
     xlabel('$\epsilon, \delta=10^{-5}$')
-    title('Local DP: Color is Clipping, Size is Noise')
+    title('Color is Clipping, Size is Noise')
     
     saveas(f, strcat(exp_folder,'overviewgraph.png'))
     datacursormode on
