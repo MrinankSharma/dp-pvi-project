@@ -1,3 +1,5 @@
+% Params: [158773.8883421], [79425.38691663]
+% exact parameters
 % function plotResultsFile(filename)
     filename = '/Users/msharma/workspace/IIB/dp-pvi-project/linreg/logs/gs_global_ana/default/results.csv';
     exp_folder = '/Users/msharma/workspace/IIB/dp-pvi-project/linreg/logs/gs_global_ana/default/';

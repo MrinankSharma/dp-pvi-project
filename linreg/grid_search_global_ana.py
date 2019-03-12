@@ -41,8 +41,8 @@ if __name__ == "__main__":
     N_dp_seeds = 10
 
     max_eps_values = [np.inf]
-    dp_noise_scales = [1e-3, 1e-2, 0.1, 1, 10]
-    clipping_bounds = [1e-3, 1e-1, 1, 1e1, 1e2, 1e3]
+    dp_noise_scales = [1e-6, 1e-4, 1e-2, 1]
+    clipping_bounds = [1, 1e2, 1e4, 1e6]
 
     if testing:
         max_eps_values = [1]
