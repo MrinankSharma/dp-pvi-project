@@ -37,12 +37,12 @@ if __name__ == "__main__":
     no_workers = 5
     damping = 0
     # will stop when the privacy budget is reached!
-    no_intervals = 5000
+    no_intervals = 500
     N_dp_seeds = 10
 
-    max_eps_values = [1, 10, 100]
+    max_eps_values = [np.inf]
     dp_noise_scales = [1e-3, 1e-2, 0.1, 1, 10]
-    clipping_bounds = [1e-3, 1e-1, 1, 1e1, 1e2]
+    clipping_bounds = [1e-3, 1e-1, 1, 1e1, 1e2, 1e3]
 
     if testing:
         max_eps_values = [1]

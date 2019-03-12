@@ -162,7 +162,7 @@ def compute_update(keys, deltas, clipping_bound, noise_scale, method='sum'):
 @ray.remote
 def run_global_dp_analytical_pvi_sync(redis_address, mean, seed, max_eps, x_train, y_train, model_noise_std, data_func,
                                       dp_noise_scale, no_workers, damping, no_intervals, clipping_bound,
-                                      output_base_dir, log_moments=None):
+                                      output_base_dir='', log_moments=None):
     np.random.seed(seed)
     tf.set_random_seed(seed)
     np.random.seed(seed)
@@ -306,6 +306,9 @@ if __name__ == "__main__":
     # Create a parameter server with some random params.
     x_train, y_train, x_test, y_test = data_func(0, 1)
 
+    clipping_bound_args = 1e4
+    eps_max = 1e5
+    noise = 1e-8
     # run on a seperate thread
     ray.get(run_global_dp_analytical_pvi_sync.remote(redis_address_args, mean_args, seed_args, np.inf, x_train, y_train,
                                                      noise_std_args,

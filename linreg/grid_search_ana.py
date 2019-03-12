@@ -38,11 +38,11 @@ if __name__ == "__main__":
     damping = 0
     N_dp_seeds = 10
     # will stop when the privacy budget is reached!
-    no_intervals = 5000
+    no_intervals = 500
 
-    max_eps_values = [1, 100, 10000]
+    max_eps_values = [np.inf]
     dp_noise_scales = [1e-3, 1e-2, 0.1, 1, 10]
-    clipping_bounds = [1e-3, 1e-1, 1, 1e1, 1e2]
+    clipping_bounds = [1e-3, 1e-1, 1, 1e1, 1e2, 1e3, 1e4]
     L_values = [1000]
 
     if testing:

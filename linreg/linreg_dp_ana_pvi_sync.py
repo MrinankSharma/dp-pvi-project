@@ -50,6 +50,7 @@ class ParameterServer(object):
         self.average_params = average_params
 
     def push(self, keys, values):
+        print(keys)
         orig_vals = {}
         updates = {}
         for key, val in self.params.iteritems():
