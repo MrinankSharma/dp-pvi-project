@@ -5,8 +5,9 @@
     exp_folder = '/Users/msharma/workspace/IIB/dp-pvi-project/linreg/logs/gs_global_ana/default/';
     
     exp_folder = '/Users/msharma/workspace/IIB/dp-pvi-project/remote-results/gs_local_ana/first_pass/'
-    exp_folder = '/Users/msharma/workspace/IIB/dp-pvi-project/remote-results/gs_global_ana/first_pass/'
-    filename = strcat(exp_folder, 'results.csv')
+%     exp_folder = '/Users/msharma/workspace/IIB/dp-pvi-project/remote-results/gs_global_ana/first_pass/'
+
+
     filename = strcat(exp_folder, 'results.csv')
     results_mat = csvread(filename);
 %     max eps: 1 eps: 2 eps_var: 3 dp_noise: 4 c: 5 kl: 6 kl_var: 7
@@ -29,6 +30,7 @@
     xlabel('$\epsilon, \delta=10^{-5}$')
     title('Local DP: Color is Clipping, Size is Noise')
     
+    saveas(f, strcat(exp_folder,'overviewgraph.png'))
     datacursormode on
     dcm = datacursormode(f);
     mydatatip = @(a, b) experimentcounterdt(a, b, eps_vals, kl_vals, counter_vals, exp_folder);
