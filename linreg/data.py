@@ -3,7 +3,7 @@ import pdb
 
 def get_toy_1d(mean, noise_std):
     a = mean
-    n_train = 5000
+    n_train = 50
     # n_train = 1000
     n_test = 200
     xtrain = np.random.randn(n_train, 1)

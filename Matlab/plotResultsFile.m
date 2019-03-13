@@ -2,9 +2,9 @@
 % exact parameters
 % function plotResultsFile(filename)
     filename = '/Users/msharma/workspace/IIB/dp-pvi-project/linreg/logs/gs_global_ana/default/results.csv';
-    exp_folder = '/Users/msharma/workspace/IIB/dp-pvi-project/remote-results/gs_local_ana/gs_local_ana/inf_private_2/';
+%     exp_folder = '/Users/msharma/workspace/IIB/dp-pvi-project/remote-results/gs_local_ana/gs_local_ana/inf_private_2/';
     
-%     exp_folder = '/Users/msharma/workspace/IIB/dp-pvi-project/remote-results/gs_global_ana/inf_private/'
+     exp_folder = '/Users/msharma/workspace/IIB/dp-pvi-project/remote-results/gs_global_ana/inf_private/'
 %     exp_folder = '/Users/msharma/workspace/IIB/dp-pvi-project/remote-results/gs_global_ana/first_pass/'
 
 
@@ -12,7 +12,7 @@
     results_mat = csvread(filename);
 %     max eps: 1 eps: 2 eps_var: 3 dp_noise: 4 c: 5 kl: 6 kl_var: 7
 %     experiment_counter: 8 ignore L for the time being
-    results_mat = results_mat(~any(isnan(results_mat(2:end, :)), 2), :);
+%     results_mat = results_mat(~any(isnan(results_mat(2:end, :)), 2), :);
     
     eps_vals = results_mat(:, 2);
     kl_vals = results_mat(:, 6);
