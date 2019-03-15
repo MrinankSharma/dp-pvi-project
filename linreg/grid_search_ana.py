@@ -41,16 +41,16 @@ if __name__ == "__main__":
     no_intervals = 500
 
     max_eps_values = [np.inf]
-    dp_noise_scales = [1e-3, 1e-2, 0.1, 1, 10]
-    clipping_bounds = [1, 1e2, 1e4, 1e5]
+    dp_noise_scales = [1, 3, 5, 7, 9]
+    clipping_bounds = [1, 10, 100, 1000, 10000]
     L_values = [10]
 
     if testing:
-        max_eps_values = [1]
-        dp_noise_scales = [1e-3]
-        clipping_bounds = [1e-3]
-        L_values = [1000]
-        N_dp_seeds = 4
+        max_eps_values = [np.inf]
+        dp_noise_scales = [1]
+        clipping_bounds = [100000000]
+        L_values = [10]
+        N_dp_seeds = 1
         tag = 'testing'
         should_overwrite = True
 
@@ -110,7 +110,7 @@ if __name__ == "__main__":
             kl_i = np.zeros(N_dp_seeds)
 
             results_objects = []
-            log_moments = generate_log_moments(1000, 32, dp_noise_scale, L)
+            log_moments = generate_log_moments(50, 32, dp_noise_scale, L)
 
             # start everything running...
             for ind, seed in enumerate(dp_seeds):

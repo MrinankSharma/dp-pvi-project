@@ -40,15 +40,17 @@ if __name__ == "__main__":
     no_intervals = 500
     N_dp_seeds = 10
 
+    N_train = 50
+
     max_eps_values = [np.inf]
-    dp_noise_scales = [1e-6, 1e-4, 1e-2, 1]
-    clipping_bounds = [1, 1e2, 1e4, 1e6]
+    dp_noise_scales = [1, 3, 5, 7, 9]
+    clipping_bounds = [1, 10, 100, 1000, 10000]
 
     if testing:
         max_eps_values = [1]
         dp_noise_scales = [1e-3]
         clipping_bounds = [1e-3]
-        L_values = [1000]
+        L_values = [10]
         N_dp_seeds = 4
         tag = 'testing'
         should_overwrite = True
@@ -57,10 +59,9 @@ if __name__ == "__main__":
     tf.set_random_seed(seed)
 
     if dataset == 'toy_1d':
-        data_func = lambda idx, N: data.get_toy_1d_shard(idx, N, data_type, mean, model_noise_std)
+        data_func = lambda idx, N: data.get_toy_1d_shard(idx, N, data_type, mean, model_noise_std, N_train)
 
-    # Create a parameter server with some random params.
-    x_train, y_train, x_test, y_test = data_func(0, 1)
+    workers_data = [data_func(w_i, no_workers) for w_i in range(no_workers)]
 
     param_combinations = list(itertools.product(max_eps_values, dp_noise_scales, clipping_bounds))
     timestr = time.strftime("%m-%d;%H:%M:%S")
@@ -112,9 +113,7 @@ if __name__ == "__main__":
 
             # start everything running...
             for ind, seed in enumerate(dp_seeds):
-                # hack to cache results
-
-                results = run_global_dp_analytical_pvi_sync.remote(None, mean, seed, max_eps, x_train, y_train,
+                results = run_global_dp_analytical_pvi_sync.remote(mean, seed, max_eps, N_train, workers_data,
                                                                    model_noise_std,
                                                                    data_func,
                                                                    dp_noise_scale, no_workers, damping, no_intervals,

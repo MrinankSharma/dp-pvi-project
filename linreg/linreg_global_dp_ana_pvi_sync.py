@@ -42,7 +42,7 @@ parser.add_argument("--clipping-bound", default=10000, type=float,
 
 @ray.remote
 class ParameterServer(object):
-    def __init__(self, keys, values, conv_thres=0.001 * 1e-2, average_params=False):
+    def __init__(self, keys, values, conv_thres=0.00001 * 1e-2, average_params=False):
         # These values will be mutated, so we must create a copy that is not
         # backed by the object store.
         values = [value.copy() for value in values]
@@ -96,17 +96,16 @@ class ParameterServer(object):
 @ray.remote
 class Worker(object):
     def __init__(
-            self, worker_index, no_workers, din, data_func, log_path, noise_var=1, seed=0):
-        np.random.seed(seed)
-        tf.set_random_seed(seed)
+            self, worker_index, no_workers, din, worker_data, log_path, noise_var=1):
         # get data for this worker
-        self.x_train, self.y_train, _, _ = data_func(
-            worker_index, no_workers)
+        self.x_train = worker_data[0]
+        self.y_train = worker_data[1]
+
         # Initialize the model
         n_train_worker = self.x_train.shape[0]
         self.n_train = n_train_worker
         self.net = linreg_models.LinReg_MFVI_analytic(
-            din, n_train_worker, noise_var=noise_var, init_seed=seed,
+            din, n_train_worker, noise_var=noise_var,
             no_workers=no_workers)
 
         self.keys = self.net.get_params()[0]
@@ -160,16 +159,14 @@ def compute_update(keys, deltas, clipping_bound, noise_scale, method='sum'):
 
 
 @ray.remote
-def run_global_dp_analytical_pvi_sync(redis_address, mean, seed, max_eps, x_train, y_train, model_noise_std, data_func,
+def run_global_dp_analytical_pvi_sync(mean, seed, max_eps, N_total, all_workers_data, model_noise_std, data_func,
                                       dp_noise_scale, no_workers, damping, no_intervals, clipping_bound,
                                       output_base_dir='', log_moments=None):
     np.random.seed(seed)
     tf.set_random_seed(seed)
-    np.random.seed(seed)
-    tf.set_random_seed(seed)
 
-    n_train_master = x_train.shape[0]
-    in_dim = x_train.shape[1]
+    n_train_master = N_total
+    in_dim = 1
 
     accountant = MomentsAccountant(MomentsAccountantPolicy.FIXED_DELTA_MAX_EPS, 1e-5, max_eps, 32)
     net = linreg_models.LinReg_MFVI_analytic(in_dim, n_train_master, noise_var=model_noise_std ** 2)
@@ -179,11 +176,12 @@ def run_global_dp_analytical_pvi_sync(redis_address, mean, seed, max_eps, x_trai
 
     if log_moments is None:
         # accountant is not important here...
-        print('calculating log moments')
+        # print('calculating log moments')
         accountant.log_moments_increment = generate_log_moments(no_workers, 32, dp_noise_scale, no_workers)
     else:
-        print('reusing log moments')
+        # print('reusing log moments')
         accountant.log_moments_increment = log_moments
+
     # accountant.log_moments_increment = net.generate_log_moments(n_train_master, 32)
     all_keys, all_values = net.get_params()
     ps = ParameterServer.remote(all_keys, all_values)
@@ -195,7 +193,7 @@ def run_global_dp_analytical_pvi_sync(redis_address, mean, seed, max_eps, x_trai
     os.makedirs(path + "data/")
     # create workers
     workers = [
-        Worker.remote(i, no_workers, in_dim, data_func, path, model_noise_std ** 2, seed=seed)
+        Worker.remote(i, no_workers, in_dim, all_workers_data[i], path, model_noise_std ** 2)
         for i in range(no_workers)]
     i = 0
     current_params = ray.get(ps.pull.remote(all_keys))
@@ -288,6 +286,8 @@ if __name__ == "__main__":
     clipping_bound_args = args.clipping_bound
     redis_address_args = args.redis_address
 
+    N_train = 50
+
     # param_file = args.param_file
     #
     # with open(param_file) as f:
@@ -301,16 +301,18 @@ if __name__ == "__main__":
     tf.set_random_seed(seed_args)
 
     if dataset_args == 'toy_1d':
-        data_func = lambda idx, N: data.get_toy_1d_shard(idx, N, data_type_args, mean_args, noise_std_args)
+        data_func = lambda idx, N: data.get_toy_1d_shard(idx, N, data_type_args, mean_args, noise_std_args, N_train)
 
     # Create a parameter server with some random params.
     x_train, y_train, x_test, y_test = data_func(0, 1)
+
+    all_workers_data = [data_func(w_i, no_workers_args) for w_i in range(no_workers_args)]
 
     clipping_bound_args = 1e4
     eps_max = 1e5
     noise = 1e-8
     # run on a seperate thread
-    ray.get(run_global_dp_analytical_pvi_sync.remote(redis_address_args, mean_args, seed_args, np.inf, x_train, y_train,
+    ray.get(run_global_dp_analytical_pvi_sync.remote(mean_args, seed_args, np.inf, N_train, all_workers_data,
                                                      noise_std_args,
                                                      data_func, dp_noise_scale_args, no_workers_args, damping_args,
                                                      no_intervals_args,

@@ -2,10 +2,10 @@
 % exact parameters
 % function plotResultsFile(filename)
     filename = '/Users/msharma/workspace/IIB/dp-pvi-project/linreg/logs/gs_global_ana/default/results.csv';
-%     exp_folder = '/Users/msharma/workspace/IIB/dp-pvi-project/remote-results/gs_local_ana/gs_local_ana/inf_private_2/';
+    exp_folder = '/Users/msharma/workspace/IIB/dp-pvi-project/remote-results/gs_local_ana/gs_local_ana/inf_private_2/';
     
-     exp_folder = '/Users/msharma/workspace/IIB/dp-pvi-project/remote-results/gs_global_ana/inf_private/'
-%     exp_folder = '/Users/msharma/workspace/IIB/dp-pvi-project/remote-results/gs_global_ana/first_pass/'
+%      exp_folder = '/Users/msharma/workspace/IIB/dp-pvi-project/remote-results/gs_global_ana/inf_private/'
+%    exp_folder = '/Users/msharma/workspace/IIB/dp-pvi-project/remote-results/gs_global_ana/first_pass/'
 
 
     filename = strcat(exp_folder, 'results.csv');

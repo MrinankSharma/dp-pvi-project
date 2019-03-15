@@ -23,8 +23,7 @@ class LinReg_MFVI_analytic():
     """
 
     def __init__(self, din, n_train, noise_var=1,
-                 prior_mean=0.0, prior_var=1.0,
-                 init_seed=0, no_workers=1,
+                 prior_mean=0.0, prior_var=1.0, no_workers=1,
                  single_thread=True):
         self.din = din
         # input and output placeholders
@@ -39,7 +38,7 @@ class LinReg_MFVI_analytic():
         # create parameters for the model
         #  [no_params, w_mean, w_var, w_n1, w_n2,
         #        prior_mean, prior_var, local_n1, local_n2]
-        res = self._create_params(init_seed, prior_mean, prior_var)
+        res = self._create_params(prior_mean, prior_var)
         self.no_weights = res[0]
         self.w_mean, self.w_var = res[1], res[2]
         self.w_n1, self.w_n2 = res[3], res[4]
@@ -119,7 +118,7 @@ class LinReg_MFVI_analytic():
         expected_lik_term = - expected_lik
         return kl_term + expected_lik_term, kl_term, expected_lik_term
 
-    def _create_params(self, init_seed, prior_mean, prior_var):
+    def _create_params(self, prior_mean, prior_var):
         no_params = self.din
         init_var = 2 * np.ones([no_params])
         init_mean = np.zeros([no_params])
@@ -294,8 +293,7 @@ class LinReg_MFVI_GRA():
     """
 
     def __init__(self, din, n_train, noise_var=0.25,
-                 prior_mean=0.0, prior_var=1,
-                 init_seed=0, no_workers=1,
+                 prior_mean=0.0, prior_var=1, no_workers=1,
                  single_thread=True):
         self.din = din
         # input and output placeholders
@@ -309,7 +307,7 @@ class LinReg_MFVI_GRA():
         # create parameters for the model
         #  [no_params, w_mean, w_var, w_n1, w_n2,
         #        prior_mean, prior_var, local_n1, local_n2]
-        res = self._create_params(init_seed, prior_mean, prior_var)
+        res = self._create_params(prior_mean, prior_var)
         self.no_weights = res[0]
         self.w_mean, self.w_log_var = res[1], res[2]
         self.w_n1, self.w_n2 = res[3], res[4]
@@ -386,7 +384,7 @@ class LinReg_MFVI_GRA():
         expected_lik_term = - expected_lik
         return kl_term + expected_lik_term, kl_term, expected_lik_term
 
-    def _create_params(self, init_seed, prior_mean, prior_var):
+    def _create_params(self, prior_mean, prior_var):
         no_params = self.din
         # initialise worker to prior mean and variance
         init_var = prior_var * np.ones([no_params])
@@ -600,7 +598,7 @@ class LinReg_MFVI_DPSGD():
 
     def __init__(self, din, n_train, accountant, noise_var=1,
                  prior_mean=0.0, prior_var=1,
-                 init_seed=0, no_workers=1, gradient_bound=5,
+                 no_workers=1, gradient_bound=5,
                  learning_rate_mean=1e-6, learning_rate_var=1e-3, dpsgd_noise_scale=5, lot_size=1000,
                  num_iterations=10000, single_thread=True):
         self.din = din
@@ -623,7 +621,7 @@ class LinReg_MFVI_DPSGD():
         self.lot_size = lot_size
         self.gradient_bound = gradient_bound
 
-        res = self._create_params(init_seed, prior_mean, prior_var)
+        res = self._create_params(prior_mean, prior_var)
         self.no_weights = res[0]
         self.w_mean, self.w_log_var = res[1], res[2]
         self.w_n1, self.w_n2 = res[3], res[4]
@@ -632,7 +630,7 @@ class LinReg_MFVI_DPSGD():
 
         self.prior_var_num = prior_var
 
-        noise_var_dpsgd = dpsgd_noise_scale * dpsgd_noise_scale * gradient_bound * gradient_bound
+        noise_var_dpsgd = dpsgd_noise_scale * gradient_bound
         # create noise distribution for convience
         # multiple dimension by 2 since there is a mean and variance for each dimension
         self.noise_dist = tfp.distributions.MultivariateNormalDiag(loc=np.zeros(2 * din),
@@ -713,7 +711,7 @@ class LinReg_MFVI_DPSGD():
         expected_lik_term = - expected_lik
         return kl_term + expected_lik_term, kl_term, expected_lik_term
 
-    def _create_params(self, init_seed, prior_mean, prior_var):
+    def _create_params(self, prior_mean, prior_var):
         no_params = self.din
         # initialise worker to prior mean and variance
         init_var = prior_var * np.ones([no_params])
@@ -1091,7 +1089,7 @@ class LinReg_MFVI_DP_analytic():
 
     def __init__(self, din, n_train, accountant, noise_var=1,
                  prior_mean=0.0, prior_var=1.0,
-                 init_seed=0, no_workers=1, clipping_bound=10,
+                 no_workers=1, clipping_bound=10,
                  dp_noise_scale=0.01, L=1000, single_thread=True):
         self.din = din
         # input and output placeholders
@@ -1104,7 +1102,7 @@ class LinReg_MFVI_DP_analytic():
 
         self.accountant = accountant
 
-        res = self._create_params(init_seed, prior_mean, prior_var)
+        res = self._create_params(prior_mean, prior_var)
         self.no_weights = res[0]
         self.w_mean, self.w_var = res[1], res[2]
         self.w_n1, self.w_n2 = res[3], res[4]
@@ -1124,7 +1122,7 @@ class LinReg_MFVI_DP_analytic():
         self.energy_fn, self.kl_term, self.expected_lik = self._build_energy()
         self.predict_m, self.predict_v = self._build_prediction()
 
-        noise_var_dpsgd = dp_noise_scale ** 2 * clipping_bound ** 2
+        noise_var_dpsgd = dp_noise_scale * clipping_bound
         # create noise distribution for convience
         # multiple dimension by 2 since there is a mean and variance for each dimension
         self.noise_dist = tfp.distributions.MultivariateNormalDiag(loc=np.zeros(2 * din),
@@ -1238,7 +1236,7 @@ class LinReg_MFVI_DP_analytic():
         expected_lik_term = - expected_lik
         return kl_term + expected_lik_term, kl_term, expected_lik_term
 
-    def _create_params(self, init_seed, prior_mean, prior_var):
+    def _create_params(self, prior_mean, prior_var):
         no_params = self.din
         init_var = 2 * np.ones([no_params])
         init_mean = np.zeros([no_params])
