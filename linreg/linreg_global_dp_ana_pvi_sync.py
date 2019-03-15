@@ -141,6 +141,22 @@ def add_noise_clip_delta(deltas, clipping_bound, noise_scale):
     return new_deltas
 
 
+def compute_true_update(keys, deltas, method='sum'):
+    mean_delta = []
+    for i, key in enumerate(keys):
+        no_deltas = len(deltas)
+        for j in range(no_deltas):
+            if j == 0:
+                sum_delta = np.copy(deltas[j][i])
+            else:
+                sum_delta += deltas[j][i]
+        if method == 'sum':
+            mean_delta.append(sum_delta)
+        elif method == 'mean':
+            mean_delta.append(sum_delta / no_deltas)
+    return mean_delta
+
+
 def compute_update(keys, deltas, clipping_bound, noise_scale, method='sum'):
     mean_delta = []
     updated_deltas = add_noise_clip_delta(deltas, clipping_bound, noise_scale)
@@ -226,6 +242,7 @@ def run_global_dp_analytical_pvi_sync(mean, seed, max_eps, N_total, all_workers_
             worker.get_delta.remote(
                 current_params, damping=damping)
             for worker in workers]
+        true_sum_delta = compute_true_update(all_keys, ray.get(deltas))
         sum_delta = compute_update(all_keys, ray.get(deltas), clipping_bound, dp_noise_scale)
         should_stop_priv = accountant.update_privacy_budget()
         mean_delta = [j / N_train_worker for j in sum_delta]
@@ -233,7 +250,8 @@ def run_global_dp_analytical_pvi_sync(mean, seed, max_eps, N_total, all_workers_
         ps.push.remote(all_keys, sum_delta)
         current_params = ray.get(ps.pull.remote(all_keys))
         KL_loss = KL_Gaussians(current_params[0], current_params[1], exact_mean_pres, exact_pres)
-        tracker_i = [mean_delta[0], mean_delta[1], current_params[0], current_params[1], KL_loss, current_eps]
+        tracker_i = [mean_delta[0], mean_delta[1], current_params[0], current_params[1], KL_loss, current_eps,
+                     true_sum_delta[0], true_sum_delta[1]]
         tracker_vals.append(tracker_i)
         print("Interval {} done".format(i))
         i += 1
