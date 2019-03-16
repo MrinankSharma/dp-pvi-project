@@ -37,6 +37,8 @@ if __name__ == "__main__":
     no_workers = 5
     damping = 0
     N_dp_seeds = 10
+
+    N_train = 50
     # will stop when the privacy budget is reached!
     no_intervals = 500
 
@@ -48,21 +50,24 @@ if __name__ == "__main__":
     if testing:
         max_eps_values = [np.inf]
         dp_noise_scales = [1]
-        clipping_bounds = [100000000]
-        L_values = [10]
+        clipping_bounds = [1]
+        L_values = [N_train/no_workers]
         N_dp_seeds = 1
         tag = 'testing'
         should_overwrite = True
-
 
     np.random.seed(seed)
     tf.set_random_seed(seed)
 
     if dataset == 'toy_1d':
-        data_func = lambda idx, N: data.get_toy_1d_shard(idx, N, data_type, mean, model_noise_std)
+        data_func = lambda idx, N: data.get_toy_1d_shard(idx, N, data_type, mean, model_noise_std, N_train)
 
-    # Create a parameter server with some random params.
-    x_train, y_train, x_test, y_test = data_func(0, 1)
+    workers_data = [data_func(w_i, no_workers) for w_i in range(no_workers)]
+    x_train = np.array([[]])
+    y_train = np.array([])
+    for worker_data in workers_data:
+        x_train = np.append(x_train, worker_data[0])
+        y_train = np.append(y_train, worker_data[1])
 
     param_combinations = list(itertools.product(max_eps_values, dp_noise_scales, clipping_bounds, L_values))
 
@@ -110,13 +115,13 @@ if __name__ == "__main__":
             kl_i = np.zeros(N_dp_seeds)
 
             results_objects = []
-            log_moments = generate_log_moments(50, 32, dp_noise_scale, L)
+            log_moments = generate_log_moments(L, 32, dp_noise_scale, L)
 
             # start everything running...
             for ind, seed in enumerate(dp_seeds):
-                results = run_dp_analytical_pvi_sync.remote(mean, seed, max_eps, x_train, y_train,
-                                                            model_noise_std,
-                                                            data_func,
+                results = run_dp_analytical_pvi_sync.remote(mean, seed, max_eps, N_train,
+                                                            x_train, y_train, model_noise_std,
+                                                            workers_data,
                                                             dp_noise_scale, no_workers, damping, no_intervals,
                                                             clipping_bound, L, output_base_dir, log_moments)
                 results_objects.append((results, ind))
@@ -140,8 +145,8 @@ if __name__ == "__main__":
             kl_var = np.var(kl_i)
 
             if kl < min_kl:
-                print('New Min KL: {}'.format(kl))
-                print(param_combination)
+                # print('New Min KL: {}'.format(kl))
+                # print(param_combination)
                 min_kl = kl
 
             # print(log_file)

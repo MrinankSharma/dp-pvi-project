@@ -18,10 +18,10 @@ def save_predictive_plot(filepath, x_train, y_train, pred_mean, pred_var, noise_
 
 def exact_inference(x_train, y_train, prior_var, noise_var):
     # prior is assumed to be zero mean
-    xtx = np.einsum('na, na->a', x_train, x_train)
-    xty = np.einsum('na, n->a', x_train, y_train)
+    xtx = np.dot(x_train, x_train)
+    xty = np.dot(x_train, y_train)
     post_var = 1/(noise_var**-1 * xtx + prior_var**-1)
-    post_mean = post_var * (noise_var**-1)*xty
+    post_mean = post_var * (noise_var**-1) * xty
     post_pres = 1/post_var
     return post_mean, post_var, post_mean*post_pres, post_pres
 
@@ -30,7 +30,7 @@ def KL_Gaussians(nat11, nat12, nat21, nat22):
     v2 = 1/nat22
     m1 = nat11/nat12
     m2 = nat21/nat22
-    KL = np.log(np.sqrt(v2/v1)) + (v1 + (m1-m2)**2)/(2*v2)
+    KL = np.log(np.sqrt(v2/v1)) + (v1 + (m1-m2)**2)/(2*v2) - 0.5
     return KL
 
 

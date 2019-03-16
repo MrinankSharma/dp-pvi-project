@@ -175,7 +175,7 @@ def compute_update(keys, deltas, clipping_bound, noise_scale, method='sum'):
 
 
 @ray.remote
-def run_global_dp_analytical_pvi_sync(mean, seed, max_eps, N_total, all_workers_data, model_noise_std, data_func,
+def run_global_dp_analytical_pvi_sync(mean, seed, max_eps, N_total, all_workers_data, x_train, y_train, model_noise_std, data_func,
                                       dp_noise_scale, no_workers, damping, no_intervals, clipping_bound,
                                       output_base_dir='', log_moments=None):
     np.random.seed(seed)
@@ -331,7 +331,7 @@ if __name__ == "__main__":
     noise = 1e-8
     # run on a seperate thread
     ray.get(run_global_dp_analytical_pvi_sync.remote(mean_args, seed_args, np.inf, N_train, all_workers_data,
-                                                     noise_std_args,
+                                                     x_train, y_train, noise_std_args,
                                                      data_func, dp_noise_scale_args, no_workers_args, damping_args,
                                                      no_intervals_args,
                                                      clipping_bound_args))

@@ -9,6 +9,8 @@ import math
 from linreg.tfutils import TensorFlowVariablesWithScope
 from linreg.log_moment_utils import generate_log_moments
 
+from linreg.inference_utils import exact_inference
+
 float_type = tf.float32
 int_type = tf.int32
 
@@ -1173,6 +1175,7 @@ class LinReg_MFVI_DP_analytic():
 
         x_red = red[0]
         y_red = red[1]
+
         # set shapes - we know that the reduced input versions will be of this shape (by definition)
         x_red.set_shape([L, 1])
         y_red.set_shape([L])

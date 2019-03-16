@@ -61,6 +61,8 @@ if __name__ == "__main__":
     if dataset == 'toy_1d':
         data_func = lambda idx, N: data.get_toy_1d_shard(idx, N, data_type, mean, model_noise_std, N_train)
 
+    x_train, y_train, x_test, y_test = data_func(0, 1)
+
     workers_data = [data_func(w_i, no_workers) for w_i in range(no_workers)]
 
     param_combinations = list(itertools.product(max_eps_values, dp_noise_scales, clipping_bounds))
@@ -114,8 +116,7 @@ if __name__ == "__main__":
             # start everything running...
             for ind, seed in enumerate(dp_seeds):
                 results = run_global_dp_analytical_pvi_sync.remote(mean, seed, max_eps, N_train, workers_data,
-                                                                   model_noise_std,
-                                                                   data_func,
+                                                                   x_train, y_train, model_noise_std,
                                                                    dp_noise_scale, no_workers, damping, no_intervals,
                                                                    clipping_bound, output_base_dir, log_moments)
                 results_objects.append((results, ind))

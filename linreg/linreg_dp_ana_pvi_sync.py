@@ -50,7 +50,6 @@ class ParameterServer(object):
         self.average_params = average_params
 
     def push(self, keys, values):
-        print(keys)
         orig_vals = {}
         updates = {}
         for key, val in self.params.iteritems():
@@ -120,14 +119,13 @@ class Worker(object):
         np.savetxt(log_path + "data/worker_{}_x.txt".format(worker_index), self.x_train)
         np.savetxt(log_path + "data/worker_{}_y.txt".format(worker_index), self.y_train)
 
-    def get_delta(self, params, damping=0.5):
+    def get_delta(self, params, damping=0):
         # apply params
         self.net.set_params(self.keys, params)
         # train the network
         self.net.train(self.x_train, self.y_train)
         # get local delta and push to server
         delta = self.net.get_param_diff(damping=damping)
-
         return delta
 
     def get_privacy_spent(self):
@@ -151,7 +149,7 @@ def compute_update(keys, deltas, method='sum'):
 
 
 @ray.remote
-def run_dp_analytical_pvi_sync(mean, seed, max_eps, N_train, model_noise_std, all_workers_data,
+def run_dp_analytical_pvi_sync(mean, seed, max_eps, N_train, x_train, y_train, model_noise_std, all_workers_data,
                                dp_noise_scale, no_workers, damping, no_intervals, clipping_bound, L, output_base_dir='',
                                log_moments=None):
     # update seeds
@@ -164,7 +162,7 @@ def run_dp_analytical_pvi_sync(mean, seed, max_eps, N_train, model_noise_std, al
     accountant = MomentsAccountant(MomentsAccountantPolicy.FIXED_DELTA, 1e-5, max_eps, 32)
     net = linreg_models.LinReg_MFVI_DP_analytic(in_dim, n_train_master, accountant, noise_var=model_noise_std ** 2)
 
-    _, _, exact_mean_pres, exact_pres = exact_inference(x_train, y_train, net.prior_var_num, model_noise_std ** 2 ** 2)
+    _, _, exact_mean_pres, exact_pres = exact_inference(x_train, y_train, net.prior_var_num, model_noise_std ** 2)
     print("Exact Inference Params: {}, {}".format(exact_mean_pres, exact_pres))
 
     # accountant is not important here...
@@ -189,7 +187,7 @@ def run_dp_analytical_pvi_sync(mean, seed, max_eps, N_train, model_noise_std, al
     if not os.path.exists(path):
         os.makedirs(path)
 
-    N_train_worker = data_func(0, no_workers)[0].shape[0]
+    N_train_worker = all_workers_data[0][0].shape[0]
     # print("N Train Worker: {}".format(N_train_worker))
     names = ["c", "dp_noise_scale", "L", "N_train_worker",
              "Num_workers", "mean", "noise_var"]
@@ -220,9 +218,8 @@ def run_dp_analytical_pvi_sync(mean, seed, max_eps, N_train, model_noise_std, al
         current_eps = ray.get(workers[0].get_privacy_spent.remote())
         ps.push.remote(all_keys, sum_delta)
         current_params = ray.get(ps.pull.remote(all_keys))
-        print("Interval {} done".format(i))
+        print("Interval {} done: {}".format(i, current_params))
         i += 1
-        print(current_params)
 
         KL_loss = KL_Gaussians(current_params[0], current_params[1], exact_mean_pres, exact_pres)
         tracker_i = [mean_delta[0], mean_delta[1], current_params[0], current_params[1], KL_loss, current_eps]
@@ -237,18 +234,16 @@ def run_dp_analytical_pvi_sync(mean, seed, max_eps, N_train, model_noise_std, al
             print("Converged - stop training")
             break
 
-    meanpres = current_params[0]
-    pres = current_params[1]
     eps = workers[0].get_privacy_spent.remote()
     eps = ray.get(eps)
     plot_title = "({:.3e}, {:.3e})-DP".format(eps, 1e-5)
 
     # save_predictive_plot(path + 'pred.png', x_train, y_train, mean, var, model_noise_std**2, plot_title)
     # report the privacy cost and plot onto the graph...
-    print(plot_title)
+    # print(plot_title)
     # compute KL(q||p)
     KL_loss = KL_Gaussians(current_params[0], current_params[1], exact_mean_pres, exact_pres)
-    print(KL_loss)
+    print("KL: {}".format(KL_loss))
     tracker_array = np.array(tracker_vals)
     return eps, KL_loss, tracker_array
 
