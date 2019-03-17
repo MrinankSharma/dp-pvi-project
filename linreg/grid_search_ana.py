@@ -44,7 +44,7 @@ if __name__ == "__main__":
 
     max_eps_values = [np.inf]
     dp_noise_scales = [1, 3, 5, 7, 9]
-    clipping_bounds = [1, 10, 100, 1000, 10000]
+    clipping_bounds = [1, 5, 10, 20, 50, 75, 100, 500, 1000, 5000, 10000]
     L_values = [10]
 
     if testing:

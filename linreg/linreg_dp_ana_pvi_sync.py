@@ -39,7 +39,7 @@ parser.add_argument("--noise-std", default=1, type=float,
 
 @ray.remote
 class ParameterServer(object):
-    def __init__(self, keys, values, conv_thres=0.00001 * 1e-2, average_params=True):
+    def __init__(self, keys, values, conv_thres=0.01 * 1e-2, average_params=True):
         # These values will be mutated, so we must create a copy that is not
         # backed by the object store.
         values = [value.copy() for value in values]

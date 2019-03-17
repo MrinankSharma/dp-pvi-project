@@ -42,7 +42,7 @@ parser.add_argument("--clipping-bound", default=10000, type=float,
 
 @ray.remote
 class ParameterServer(object):
-    def __init__(self, keys, values, conv_thres=0.00001 * 1e-2, average_params=False):
+    def __init__(self, keys, values, conv_thres=0.01 * 1e-2, average_params=False):
         # These values will be mutated, so we must create a copy that is not
         # backed by the object store.
         values = [value.copy() for value in values]
@@ -175,7 +175,7 @@ def compute_update(keys, deltas, clipping_bound, noise_scale, method='sum'):
 
 
 @ray.remote
-def run_global_dp_analytical_pvi_sync(mean, seed, max_eps, N_total, all_workers_data, x_train, y_train, model_noise_std, data_func,
+def run_global_dp_analytical_pvi_sync(mean, seed, max_eps, N_total, all_workers_data, x_train, y_train, model_noise_std,
                                       dp_noise_scale, no_workers, damping, no_intervals, clipping_bound,
                                       output_base_dir='', log_moments=None):
     np.random.seed(seed)
@@ -217,7 +217,7 @@ def run_global_dp_analytical_pvi_sync(mean, seed, max_eps, N_total, all_workers_
     if not os.path.exists(path):
         os.makedirs(path)
 
-    N_train_worker = data_func(0, no_workers)[0].shape[0]
+    N_train_worker = all_workers_data[0][0].shape[0]
     names = ["N_train_worker",
              "Num_workers", "mean", "noise_var"]
     params_save = []
@@ -253,9 +253,8 @@ def run_global_dp_analytical_pvi_sync(mean, seed, max_eps, N_total, all_workers_
         tracker_i = [mean_delta[0], mean_delta[1], current_params[0], current_params[1], KL_loss, current_eps,
                      true_sum_delta[0], true_sum_delta[1]]
         tracker_vals.append(tracker_i)
-        print("Interval {} done".format(i))
+        print("Interval {} done: {}".format(i, current_params))
         i += 1
-        print(current_params)
 
         # save to file, tracking stuff
         with open(tracker_file, 'a') as file:

@@ -35,7 +35,7 @@ if __name__ == "__main__":
     mean = 2
     model_noise_std = 0.5
     no_workers = 5
-    damping = 0
+    damping = 0.5
     # will stop when the privacy budget is reached!
     no_intervals = 500
     N_dp_seeds = 10
@@ -44,14 +44,13 @@ if __name__ == "__main__":
 
     max_eps_values = [np.inf]
     dp_noise_scales = [1, 3, 5, 7, 9]
-    clipping_bounds = [1, 10, 100, 1000, 10000]
+    clipping_bounds = [1, 5, 10, 20, 50, 75, 100, 500, 1000, 5000, 10000]
 
     if testing:
-        max_eps_values = [1]
-        dp_noise_scales = [1e-3]
-        clipping_bounds = [1e-3]
-        L_values = [10]
-        N_dp_seeds = 4
+        max_eps_values = [np.inf]
+        dp_noise_scales = [1e-18]
+        clipping_bounds = [1e9]
+        N_dp_seeds = 1
         tag = 'testing'
         should_overwrite = True
 
@@ -61,9 +60,12 @@ if __name__ == "__main__":
     if dataset == 'toy_1d':
         data_func = lambda idx, N: data.get_toy_1d_shard(idx, N, data_type, mean, model_noise_std, N_train)
 
-    x_train, y_train, x_test, y_test = data_func(0, 1)
-
     workers_data = [data_func(w_i, no_workers) for w_i in range(no_workers)]
+    x_train = np.array([[]])
+    y_train = np.array([])
+    for worker_data in workers_data:
+        x_train = np.append(x_train, worker_data[0])
+        y_train = np.append(y_train, worker_data[1])
 
     param_combinations = list(itertools.product(max_eps_values, dp_noise_scales, clipping_bounds))
     timestr = time.strftime("%m-%d;%H:%M:%S")
@@ -109,7 +111,7 @@ if __name__ == "__main__":
             kl_i = np.zeros(N_dp_seeds)
 
             results_objects = []
-            log_moments = generate_log_moments(5, 32, dp_noise_scale, 5)
+            log_moments = generate_log_moments(no_workers, 32, dp_noise_scale, no_workers)
 
             # this code parallises the executtion of multiple seeds at once, then collects results for them.
 
