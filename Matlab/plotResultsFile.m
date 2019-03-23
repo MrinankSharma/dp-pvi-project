@@ -7,8 +7,9 @@
 %      exp_folder = '/Users/msharma/workspace/IIB/dp-pvi-project/remote-results/gs_global_ana/inf_private/'
 %    exp_folder = '/Users/msharma/workspace/IIB/dp-pvi-project/remote-results/gs_global_ana/first_pass/'
 
-
+    exp_folder = '/Users/msharma/workspace/IIB/dp-pvi-project/linreg/logs/gs_global_ana/testing/';
     filename = strcat(exp_folder, 'results.csv');
+ 
     results_mat = csvread(filename);
 %     max eps: 1 eps: 2 eps_var: 3 dp_noise: 4 c: 5 kl: 6 kl_var: 7
 %     experiment_counter: 8 ignore L for the time being

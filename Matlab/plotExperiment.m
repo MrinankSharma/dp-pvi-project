@@ -58,7 +58,9 @@ function plotExperiment(exp_ind, exp_folder)
         plot(df_ax1, 1:R, data_mat(:, 1));
         plot(df_ax2, 1:R, data_mat(:, 2));
         plot(pf_ax1, 1:R, data_mat(:, 3));
+        plot(df_ax1, 1:R, data_mat(:, 7), ':');
         plot(pf_ax2, 1:R, data_mat(:, 4));
+        plot(df_ax2, 1:R, data_mat(:, 8), ':');
         plot(pf_ax3, 1:R, data_mat(:, 3)./data_mat(:, 4));
         plot(ef_ax1, 1:R, data_mat(:, 5));
         plot(ef_ax2, 1:R, data_mat(:, 6));

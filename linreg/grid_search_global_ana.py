@@ -36,27 +36,27 @@ if __name__ == "__main__":
     data_type = "homous"
     mean = 2
     model_noise_std = 0.5
-    no_workers = 5
+    no_workers = 20
     # will stop when the privacy budget is reached!
-    no_intervals = 100
+    no_intervals = 500
     N_dp_seeds = 10
 
     if average:
-        update_method = 'average'
+        update_method = 'mean'
     else:
         update_method = 'sum'
 
-    N_train = 50
+    N_train = no_workers * 10
 
     max_eps_values = [np.inf]
     dp_noise_scales = [1, 3, 5, 7, 9]
-    damping_vals = [0.5, 0.75]
-    clipping_bounds = [1, 5, 10, 20, 50, 75, 100, 500, 1000, 5000, 10000]
+    damping_vals = [0.5, 0.6, 0.7, 0.8, 0.9]
+    clipping_bounds = [10, 20, 40, 60, 100]
 
     if testing:
         max_eps_values = [np.inf]
-        dp_noise_scales = [1, 2]
-        clipping_bounds = [1]
+        dp_noise_scales = [1]
+        clipping_bounds = [60]
         damping_vals = [0.5]
         N_dp_seeds = 1
         tag = 'testing'
