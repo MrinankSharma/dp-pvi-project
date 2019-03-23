@@ -3,7 +3,7 @@
 % function plotResultsFile(filename)
     filename = '/Users/msharma/workspace/IIB/dp-pvi-project/linreg/logs/gs_global_ana/default/results.csv';
     exp_folder = '/Users/msharma/workspace/IIB/dp-pvi-project/remote-results/gs_local_ana/gs_local_ana/inf_private_2/';
-    
+        exp_folder = '/Users/msharma/workspace/IIB/dp-pvi-project/remote-results-ulam/gs_local_ana/less_data_more_eps/';
 %      exp_folder = '/Users/msharma/workspace/IIB/dp-pvi-project/remote-results/gs_global_ana/inf_private/'
 %    exp_folder = '/Users/msharma/workspace/IIB/dp-pvi-project/remote-results/gs_global_ana/first_pass/'
 
@@ -21,7 +21,7 @@
     counter_vals = results_mat(:, 8);
     
     f = figure('pos', [10 10 1200 800]);
-    scatter(eps_vals, kl_vals, 100*log10(noise_vals*10^8), log10(c_vals), 'o', 'filled');
+    scatter(eps_vals, kl_vals, 100*noise_vals, log10(c_vals), 'o', 'filled');
     
     colormap parula
     c = colorbar;

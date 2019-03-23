@@ -40,7 +40,7 @@ if __name__ == "__main__":
 
     N_train = 50
     # will stop when the privacy budget is reached!
-    no_intervals = 500
+    no_intervals = 50
 
     max_eps_values = [np.inf]
     dp_noise_scales = [1, 3, 5, 7, 9]
@@ -52,7 +52,7 @@ if __name__ == "__main__":
         dp_noise_scales = [1]
         clipping_bounds = [1]
         L_values = [N_train/no_workers]
-        N_dp_seeds = 1
+        N_dp_seeds = 2
         tag = 'testing'
         should_overwrite = True
 

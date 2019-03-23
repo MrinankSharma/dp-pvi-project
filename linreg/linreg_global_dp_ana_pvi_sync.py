@@ -42,7 +42,7 @@ parser.add_argument("--clipping-bound", default=10000, type=float,
 
 @ray.remote
 class ParameterServer(object):
-    def __init__(self, keys, values, conv_thres=0.01 * 1e-2, average_params=False):
+    def __init__(self, keys, values, conv_thres=0.01 * 1e-2):
         # These values will be mutated, so we must create a copy that is not
         # backed by the object store.
         values = [value.copy() for value in values]
@@ -50,34 +50,26 @@ class ParameterServer(object):
         self.should_stop = False
         self.conv_thres = conv_thres
         self.param_it_count = 0.0
-        self.average_params = average_params
+
 
     def push(self, keys, values):
-        orig_vals = {}
         updates = {}
+        orig_vals = {}
+        pres_key = 'variational_nat/precision'
+
         for key, val in self.params.iteritems():
             orig_vals[key] = val
             updates[key] = 0
 
-        if self.average_params:
-            param_sum = {}
-            for key, value in self.params.iteritems():
-                param_sum[key] = value * self.param_it_count
+        for key, value in zip(keys, values):
+            orig_vals[key] = self.params[key]
+            self.params[key] += value
+            updates[key] += value
 
-            # update params as before
-            for key, value in zip(keys, values):
-                self.params[key] += value
-                updates[key] += value
-
-            self.param_it_count += 1.0
-
-            for key, value in self.params.iteritems():
-                self.params[key] = (self.params[key] + param_sum[key]) / self.param_it_count
-
-        else:
-            for key, value in zip(keys, values):
-                self.params[key] += value
-                updates[key] += value
+        # reject value if it results in a negative variance.
+        if self.params[pres_key] < 0:
+            self.params[pres_key] = orig_vals[key]
+            print('Rejected negative precision')
 
         if not self.should_stop:
             self.should_stop = True
@@ -177,7 +169,7 @@ def compute_update(keys, deltas, clipping_bound, noise_scale, method='sum'):
 @ray.remote
 def run_global_dp_analytical_pvi_sync(mean, seed, max_eps, N_total, all_workers_data, x_train, y_train, model_noise_std,
                                       dp_noise_scale, no_workers, damping, no_intervals, clipping_bound,
-                                      output_base_dir='', log_moments=None):
+                                      output_base_dir='', log_moments=None, update_method = 'sum'):
     np.random.seed(seed)
     tf.set_random_seed(seed)
 
@@ -219,12 +211,13 @@ def run_global_dp_analytical_pvi_sync(mean, seed, max_eps, N_total, all_workers_
 
     N_train_worker = all_workers_data[0][0].shape[0]
     names = ["N_train_worker",
-             "Num_workers", "mean", "noise_var"]
+             "Num_workers", "mean", "noise_var", "update_method"]
     params_save = []
     params_save.append(N_train_worker)
     params_save.append(no_workers)
     params_save.append(mean)
     params_save.append(model_noise_std ** 2)
+    params_save.append(update_method)
     param_file = path + 'settings.txt'
     text_file = open(param_file, "w")
     text_file.write('Parameters\n')
@@ -242,7 +235,7 @@ def run_global_dp_analytical_pvi_sync(mean, seed, max_eps, N_total, all_workers_
             worker.get_delta.remote(
                 current_params, damping=damping)
             for worker in workers]
-        true_sum_delta = compute_true_update(all_keys, ray.get(deltas))
+        true_sum_delta = compute_true_update(all_keys, ray.get(deltas), update_method)
         sum_delta = compute_update(all_keys, ray.get(deltas), clipping_bound, dp_noise_scale)
         should_stop_priv = accountant.update_privacy_budget()
         mean_delta = [j / N_train_worker for j in sum_delta]
