@@ -55,7 +55,7 @@ if __name__ == "__main__":
 
     if testing:
         max_eps_values = [np.inf]
-        dp_noise_scales = [1]
+        dp_noise_scales = [1, 2]
         clipping_bounds = [1]
         damping_vals = [0.5]
         N_dp_seeds = 1

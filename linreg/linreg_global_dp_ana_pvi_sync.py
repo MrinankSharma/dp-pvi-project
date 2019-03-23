@@ -211,20 +211,20 @@ def run_global_dp_analytical_pvi_sync(mean, seed, max_eps, N_total, all_workers_
 
     N_train_worker = all_workers_data[0][0].shape[0]
     names = ["N_train_worker",
-             "Num_workers", "mean", "noise_var", "update_method"]
+             "Num_workers", "mean", "noise_var"]
     params_save = []
     params_save.append(N_train_worker)
     params_save.append(no_workers)
     params_save.append(mean)
     params_save.append(model_noise_std ** 2)
-    params_save.append(update_method)
     param_file = path + 'settings.txt'
     text_file = open(param_file, "w")
     text_file.write('Parameters\n')
     for i in range(len(names)):
         text_file.write('{} : {:.2e} \n'.format(names[i], params_save[i]))
     text_file.write('Exact Inference (Non-PVI)\n')
-    text_file.write("Params: {}, {}".format(exact_mean_pres, exact_pres))
+    text_file.write("Params: {}, {}\n".format(exact_mean_pres, exact_pres))
+    text_file.write("Update Method: {}\n".format(update_method))
     text_file.close()
 
     tracker_file = path + 'params.txt'
