@@ -242,16 +242,13 @@ def run_global_dp_analytical_pvi_sync(mean, seed, max_eps, N_total, all_workers_
                 current_params, damping=damping)
             for worker in workers]
         true_sum_delta = compute_true_update(all_keys, ray.get(deltas), update_method)
-        print(true_sum_delta)
         sum_delta = compute_update(all_keys, ray.get(deltas), clipping_bound, dp_noise_scale, update_method)
-        print(sum_delta)
         should_stop_priv = accountant.update_privacy_budget()
-        mean_delta = [j / N_train_worker for j in sum_delta]
         current_eps = accountant.current_tracked_val
         ps.push.remote(all_keys, sum_delta)
         current_params = ray.get(ps.pull.remote(all_keys))
         KL_loss = KL_Gaussians(current_params[0], current_params[1], exact_mean_pres, exact_pres)
-        tracker_i = [mean_delta[0], mean_delta[1], current_params[0], current_params[1], KL_loss, current_eps,
+        tracker_i = [sum_delta[0], sum_delta[1], current_params[0], current_params[1], KL_loss, current_eps,
                      true_sum_delta[0], true_sum_delta[1]]
         tracker_vals.append(tracker_i)
         print("Interval {} done: {}".format(i, current_params))

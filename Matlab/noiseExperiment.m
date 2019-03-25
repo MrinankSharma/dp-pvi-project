@@ -22,8 +22,8 @@ nat1_estimates = zeros(1, N_test);
 nat2_estimates = zeros(1, N_test);
 
 for i=1:N_test
-    xTx_noisy = sum(x.^2 + 0.4*randn(1, N));
-    xTy_noisy = sum(x.*y + 0.4*randn(1, N));
+    xTx_noisy = sum(x.^2) + randn;
+    xTy_noisy = sum(x.*y) + randn;
     var_post_i = (prior_sigma^2 * sigma_noise^2)*(sigma_noise^2 + prior_sigma^2*xTx_noisy)^-1;
     mean_post_i = (xTy_noisy * prior_sigma^2 + sigma_noise^2 * prior_mean) * ...
         (sigma_noise^2 + prior_sigma^2*xTx_noisy)^-1;

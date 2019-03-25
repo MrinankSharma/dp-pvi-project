@@ -7,10 +7,12 @@ import argparse
 import linreg.data as data
 from linreg.linreg_dp_ana_pvi_sync import run_dp_analytical_pvi_sync
 from linreg.file_utils import get_params_from_csv
+from linreg.inference_utils import exact_inference
 import itertools
 import time
 import os
 import ray
+import json
 
 from linreg.log_moment_utils import generate_log_moments
 
@@ -20,6 +22,8 @@ parser.add_argument("--output-base-dir", default='', type=str,
 parser.add_argument("--tag", default='default', type=str)
 parser.add_argument("--overwrite", dest='overwrite', action='store_true')
 parser.add_argument("--testing", dest='testing', action='store_true')
+parser.add_argument("--no-workers", default=5, type=int,
+                    help="output base folder.")
 
 if __name__ == "__main__":
     args = parser.parse_args()
@@ -27,40 +31,44 @@ if __name__ == "__main__":
     should_overwrite = args.overwrite
     testing = args.testing
     tag = args.tag
+    no_workers = args.no_workers
 
-    # really, we should average over multiple seeds
-    seed = 42
-    dataset = 'toy_1d'
-    data_type = "homous"
-    mean = 2
-    model_noise_std = 0.5
-    no_workers = 5
-    damping = 0
-    N_dp_seeds = 10
-
-    N_train = 50
-    # will stop when the privacy budget is reached!
-    no_intervals = 50
+    experiment_setup = {
+        "seed": 42,
+        "dataset": 'toy_1d',
+        "data_type": 'homous',
+        "mean": 2,
+        "model_noise_std": 0.5,
+        "N_dp_seeds": 10,
+        "points_per_worker": 10,
+        "tag": tag,
+        "num_workers": no_workers,
+        "num_intervals": 500,
+    }
 
     max_eps_values = [np.inf]
-    dp_noise_scales = [1, 3, 5, 7, 9]
-    clipping_bounds = [1, 5, 10, 20, 50, 75, 100, 500, 1000, 5000, 10000]
-    L_values = [10]
+    dp_noise_scales = [1, 2, 3]
+    clipping_bounds = [0.1, 0.3, 0.5, 0.7, 1, 2]
+    damping_vals = [0.25, 0.5, 0.75, 0.9]
+    N_train = no_workers * experiment_setup['points_per_worker']
 
     if testing:
         max_eps_values = [np.inf]
         dp_noise_scales = [1]
         clipping_bounds = [1]
-        L_values = [N_train/no_workers]
-        N_dp_seeds = 2
+        damping_vals = [0.25]
+        experiment_setup["N_dp_seeds"] = 2
+        experiment_setup["num_intervals"] = 5
         tag = 'testing'
         should_overwrite = True
 
-    np.random.seed(seed)
-    tf.set_random_seed(seed)
+    np.random.seed(experiment_setup['seed'])
+    tf.set_random_seed(experiment_setup['seed'])
 
-    if dataset == 'toy_1d':
-        data_func = lambda idx, N: data.get_toy_1d_shard(idx, N, data_type, mean, model_noise_std, N_train)
+    if experiment_setup['dataset'] == 'toy_1d':
+        data_func = lambda idx, N: data.get_toy_1d_shard(idx, N, experiment_setup['data_type'],
+                                                         experiment_setup['mean'], experiment_setup['model_noise_std'],
+                                                         N_train)
 
     workers_data = [data_func(w_i, no_workers) for w_i in range(no_workers)]
     x_train = np.array([[]])
@@ -69,7 +77,12 @@ if __name__ == "__main__":
         x_train = np.append(x_train, worker_data[0])
         y_train = np.append(y_train, worker_data[1])
 
-    param_combinations = list(itertools.product(max_eps_values, dp_noise_scales, clipping_bounds, L_values))
+    param_combinations = list(itertools.product(max_eps_values, dp_noise_scales, clipping_bounds, damping_vals))
+
+    _, _, exact_mean_pres, exact_pres = exact_inference(x_train, y_train, 2, experiment_setup['model_noise_std'] ** 2)
+
+    experiment_setup['exact_mean_pres'] = exact_mean_pres
+    experiment_setup['exact_pres'] = exact_pres
 
     timestr = time.strftime("%m-%d;%H:%M:%S")
     path = output_base_dir
@@ -81,7 +94,11 @@ if __name__ == "__main__":
     log_file_path = path + 'results.txt'
     csv_file_path = path + 'results.csv'
 
-    dp_seeds = np.arange(1, N_dp_seeds + 1)
+    setup_file = path + 'setup.json'
+    with open(setup_file, 'w') as outfile:
+        json.dump(experiment_setup, outfile)
+
+    dp_seeds = np.arange(1, experiment_setup['N_dp_seeds'] + 1)
 
     searched_params = []
     # if some results have already been processed with this tag
@@ -109,21 +126,22 @@ if __name__ == "__main__":
             max_eps = param_combination[0]
             dp_noise_scale = param_combination[1]
             clipping_bound = param_combination[2]
-            L = param_combination[3]
+            damping_val = param_combination[3]
 
-            eps_i = np.zeros(N_dp_seeds)
-            kl_i = np.zeros(N_dp_seeds)
+            eps_i = np.zeros(experiment_setup['N_dp_seeds'])
+            kl_i = np.zeros(experiment_setup['N_dp_seeds'])
 
             results_objects = []
-            log_moments = generate_log_moments(L, 32, dp_noise_scale, L)
+            log_moments = generate_log_moments(no_workers, 32, dp_noise_scale, no_workers)
 
             # start everything running...
             for ind, seed in enumerate(dp_seeds):
-                results = run_dp_analytical_pvi_sync.remote(mean, seed, max_eps, N_train,
-                                                            x_train, y_train, model_noise_std,
+                results = run_dp_analytical_pvi_sync.remote(experiment_setup['mean'], seed, max_eps, N_train,
+                                                            x_train, y_train, experiment_setup['model_noise_std'],
                                                             workers_data,
-                                                            dp_noise_scale, no_workers, damping, no_intervals,
-                                                            clipping_bound, L, output_base_dir, log_moments)
+                                                            dp_noise_scale, no_workers, damping_val,
+                                                            experiment_setup['num_intervals'],
+                                                            clipping_bound, output_base_dir, log_moments)
                 results_objects.append((results, ind))
 
             # fetch one by one
@@ -153,7 +171,7 @@ if __name__ == "__main__":
             # print('logging!')
             text_file = open(log_file_path, "a")
             text_file.write(
-                "max_eps: {} eps: {} eps_var: {:.4e} dp_noise: {} c: {} kl: {} kl_var: {:.4e} experiment_counter:{} L:{}\n".format(
+                "max_eps: {} eps: {} eps_var: {:.4e} dp_noise: {} c: {} kl: {} kl_var: {:.4e} experiment_counter:{} damping:{}\n".format(
                     max_eps,
                     eps,
                     eps_var,
@@ -162,13 +180,13 @@ if __name__ == "__main__":
                     kl,
                     kl_var,
                     experiment_counter,
-                    L))
+                    damping_val))
             text_file.close()
             csv_file = open(csv_file_path, "a")
             csv_file.write(
-                "{},{},{:.4e},{},{},{},{:.4e},{},{}\n".format(max_eps, eps, eps_var, dp_noise_scale, clipping_bound,
+                "{},{},{:.4e},{},{},{},{:.4e},{},{:.4e}\n".format(max_eps, eps, eps_var, dp_noise_scale, clipping_bound,
                                                               kl,
-                                                              kl_var, experiment_counter, L))
+                                                              kl_var, experiment_counter, damping_val))
             csv_file.close()
             experiment_counter += 1
         except Exception, e:

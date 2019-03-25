@@ -1115,7 +1115,7 @@ class LinReg_MFVI_DP_analytic():
 
         self.clipping_bound = clipping_bound
         self.dp_noise_scale = dp_noise_scale
-        self.lot_size = L
+        self.lot_size = self.n_train
 
         # create helper assignment ops
         self._create_assignment_ops()

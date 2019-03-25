@@ -49,16 +49,17 @@ if __name__ == "__main__":
     N_train = no_workers * 10
 
     max_eps_values = [np.inf]
-    dp_noise_scales = [1, 3, 5, 7, 9]
-    damping_vals = [0.5, 0.6, 0.7, 0.8, 0.9]
+    dp_noise_scales = [1]
+    damping_vals = [0.25, 0.5, 0.9]
     clipping_bounds = [10, 20, 40, 60, 100]
 
     if testing:
         max_eps_values = [np.inf]
         dp_noise_scales = [1]
-        clipping_bounds = [60]
-        damping_vals = [0.5]
+        clipping_bounds = [10]
+        damping_vals = [0.9]
         N_dp_seeds = 1
+        dp_seeds=[6]
         tag = 'testing'
         should_overwrite = True
 
@@ -100,7 +101,7 @@ if __name__ == "__main__":
     min_kl = 10000
     ray.init()
 
-    dp_seeds = np.arange(1, N_dp_seeds + 1)
+    # dp_seeds = np.arange(1, N_dp_seeds + 1)
 
     experiment_counter = 1
     for param_combination in param_combinations:

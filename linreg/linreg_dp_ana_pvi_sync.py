@@ -77,7 +77,7 @@ class ParameterServer(object):
 @ray.remote
 class Worker(object):
     def __init__(
-            self, worker_index, no_workers, din, worker_data, log_path, max_eps, dp_noise, c, L_in, noise_var=1,
+            self, worker_index, no_workers, din, worker_data, log_path, max_eps, dp_noise, c, noise_var=1,
             log_moments=None):
         # get data for this worker
         self.x_train = worker_data[0]
@@ -88,7 +88,7 @@ class Worker(object):
         self.accountant = MomentsAccountant(MomentsAccountantPolicy.FIXED_DELTA_MAX_EPS, 1e-5, max_eps, 32)
         self.net = linreg_models.LinReg_MFVI_DP_analytic(
             din, n_train_worker, self.accountant, noise_var=noise_var, no_workers=no_workers, clipping_bound=c,
-            dp_noise_scale=dp_noise, L=L_in)
+            dp_noise_scale=dp_noise)
 
         if log_moments is None:
             # print('calculating log moments')
@@ -132,7 +132,7 @@ def compute_update(keys, deltas, method='sum'):
 
 @ray.remote
 def run_dp_analytical_pvi_sync(mean, seed, max_eps, N_train, x_train, y_train, model_noise_std, all_workers_data,
-                               dp_noise_scale, no_workers, damping, no_intervals, clipping_bound, L, output_base_dir='',
+                               dp_noise_scale, no_workers, damping, no_intervals, clipping_bound, output_base_dir='',
                                log_moments=None):
     # update seeds
     np.random.seed(seed)
@@ -160,7 +160,7 @@ def run_dp_analytical_pvi_sync(mean, seed, max_eps, N_train, x_train, y_train, m
     os.makedirs(path + "data/")
     # create workers
     workers = [
-        Worker.remote(i, no_workers, in_dim, all_workers_data[i], path, max_eps, dp_noise_scale, clipping_bound, L,
+        Worker.remote(i, no_workers, in_dim, all_workers_data[i], path, max_eps, dp_noise_scale, clipping_bound,
                       model_noise_std ** 2, log_moments)
         for i in range(no_workers)]
     i = 0

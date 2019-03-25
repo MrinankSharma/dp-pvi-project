@@ -7,7 +7,8 @@
 %      exp_folder = '/Users/msharma/workspace/IIB/dp-pvi-project/remote-results/gs_global_ana/inf_private/'
 %    exp_folder = '/Users/msharma/workspace/IIB/dp-pvi-project/remote-results/gs_global_ana/first_pass/'
 
-    exp_folder = '/Users/msharma/workspace/IIB/dp-pvi-project/linreg/logs/gs_global_ana/testing/';
+%     exp_folder = '/Users/msharma/workspace/IIB/dp-pvi-project/linreg/logs/gs_global_ana/testing/';
+exp_folder = '/Users/msharma/workspace/IIB/dp-pvi-project/remote-results-hinton/gs_global_ana/more_workers_damped/'
     filename = strcat(exp_folder, 'results.csv');
  
     results_mat = csvread(filename);
@@ -20,6 +21,7 @@
     c_vals = results_mat(:, 5);
     noise_vals = results_mat(:, 4);
     counter_vals = results_mat(:, 8);
+    damping_vals = results_mat(:, 10);
     
     f = figure('pos', [10 10 1200 800]);
     scatter(eps_vals, kl_vals, 100*noise_vals, log10(c_vals), 'o', 'filled');
@@ -36,7 +38,7 @@
     saveas(f, strcat(exp_folder,'overviewgraph.png'))
     datacursormode on
     dcm = datacursormode(f);
-    mydatatip = @(a, b) experimentcounterdt(a, b, eps_vals, kl_vals, counter_vals, exp_folder);
+    mydatatip = @(a, b) experimentcounterdt(a, b, results_mat, exp_folder);
     set(dcm,'UpdateFcn', mydatatip);
     
 % end
