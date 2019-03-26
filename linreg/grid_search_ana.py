@@ -23,6 +23,8 @@ parser.add_argument("--tag", default='default', type=str)
 parser.add_argument("--overwrite", dest='overwrite', action='store_true')
 parser.add_argument("--testing", dest='testing', action='store_true')
 parser.add_argument("--no-workers", default=5, type=int,
+                    help="num_workers.")
+parser.add_argument("--N-dp-seeds", default=10, type=int,
                     help="output base folder.")
 
 if __name__ == "__main__":
@@ -39,7 +41,7 @@ if __name__ == "__main__":
         "data_type": 'homous',
         "mean": 2,
         "model_noise_std": 0.5,
-        "N_dp_seeds": 10,
+        "N_dp_seeds": args.N_dp_seeds,
         "points_per_worker": 10,
         "tag": tag,
         "num_workers": no_workers,
