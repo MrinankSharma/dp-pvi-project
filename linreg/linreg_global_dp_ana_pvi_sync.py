@@ -106,8 +106,8 @@ class Worker(object):
             no_workers=no_workers)
 
         self.keys = self.net.get_params()[0]
-        np.savetxt(log_path + "data/worker_{}_x.txt".format(worker_index), self.x_train)
-        np.savetxt(log_path + "data/worker_{}_y.txt".format(worker_index), self.y_train)
+        # np.savetxt(log_path + "data/worker_{}_x.txt".format(worker_index), self.x_train)
+        # np.savetxt(log_path + "data/worker_{}_y.txt".format(worker_index), self.y_train)
 
     def get_delta(self, params, damping=0.5):
         # apply params

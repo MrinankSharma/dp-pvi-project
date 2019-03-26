@@ -85,7 +85,7 @@ if __name__ == "__main__":
 
     param_combinations = list(itertools.product(max_eps_values, dp_noise_scales, clipping_bounds, damping_vals))
 
-    _, _, exact_mean_pres, exact_pres = exact_inference(x_train, y_train, 2, experiment_setup['model_noise_std'] ** 2)
+    _, _, exact_mean_pres, exact_pres = exact_inference(x_train, y_train, 1, experiment_setup['model_noise_std'] ** 2)
 
     experiment_setup['exact_mean_pres'] = exact_mean_pres
     experiment_setup['exact_pres'] = exact_pres
@@ -118,7 +118,7 @@ if __name__ == "__main__":
     min_kl = 10000
     ray.init()
 
-    # dp_seeds = np.arange(1, N_dp_seeds + 1)
+    dp_seeds = np.arange(1, experiment_setup["N_dp_seeds"] + 1)
 
     experiment_counter = 1
     for param_combination in param_combinations:
@@ -142,7 +142,7 @@ if __name__ == "__main__":
 
             # this code parallises the executtion of multiple seeds at once, then collects results for them.
             # start everything running...
-            for ind, seed in enumerate(experiment_setup["N_dp_seeds"]):
+            for ind, seed in enumerate(dp_seeds):
                 results = run_global_dp_analytical_pvi_sync.remote(experiment_setup["mean"], seed, max_eps, N_train,
                                                                    workers_data,
                                                                    x_train, y_train,
@@ -177,10 +177,9 @@ if __name__ == "__main__":
 
             print(kl)
             text_file = open(log_file_path, "a")
-            results_array = [max_eps, eps, eps_var, dp_noise_scale, clipping_bound, kl, kl_var, experiment_counter,
-                             update_method, damping_val]
+            results_array = [max_eps, eps, eps_var, dp_noise_scale, clipping_bound, kl, kl_var, experiment_counter, damping_val]
             text_file.write(
-                "max eps: {} eps: {} eps_var: {:.4e} dp_noise: {} c: {} kl: {} kl_var: {:.4e} experiment_counter: {} update_method: {} damping: {}\n".format(
+                "max eps: {} eps: {} eps_var: {:.4e} dp_noise: {} c: {} kl: {} kl_var: {:.4e} experiment_counter: {} damping: {}\n".format(
                     *results_array))
             text_file.close()
             csv_file = open(csv_file_path, "a")
@@ -188,7 +187,7 @@ if __name__ == "__main__":
             if update_method == 'average':
                 update = 1
             csv_file.write(
-                "{},{},{:.4e},{},{},{},{:.4e},{},{},{}\n".format(*results_array))
+                "{},{},{:.4e},{},{},{},{:.4e},{},{}\n".format(*results_array))
             csv_file.close()
             experiment_counter += 1
         except Exception, e:

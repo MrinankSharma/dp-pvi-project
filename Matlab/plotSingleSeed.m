@@ -7,7 +7,7 @@ function plotSingleSeed(exp_ind, exp_folder, seed_ind, results_mat)
     c = results_mat(exp_ind, 5);
     noise = results_mat(exp_ind, 4);
     counter = results_mat(exp_ind, 8);
-    damping = results_mat(exp_ind, 10);
+    damping = results_mat(exp_ind, 9);
     title_str = sprintf("averages exp: %d eps: %.4e kl: %.4e c: %.4e noise: %.4e damping: %.4e ",  ...
         counter, eps, kl, c, noise, damping)
     

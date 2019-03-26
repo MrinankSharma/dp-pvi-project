@@ -7,7 +7,7 @@ import argparse
 import linreg.data as data
 from linreg.linreg_dp_ana_pvi_sync import run_dp_analytical_pvi_sync
 from linreg.file_utils import get_params_from_csv
-from linreg.inference_utils import exact_inference
+from linreg.inference_utils import exact_inference, KL_Gaussians
 import itertools
 import time
 import os
@@ -59,7 +59,7 @@ if __name__ == "__main__":
         dp_noise_scales = [1]
         clipping_bounds = [1]
         damping_vals = [0.25]
-        experiment_setup["N_dp_seeds"] = 2
+        experiment_setup["N_dp_seeds"] = 1
         experiment_setup["num_intervals"] = 5
         tag = 'testing'
         should_overwrite = True
@@ -81,7 +81,7 @@ if __name__ == "__main__":
 
     param_combinations = list(itertools.product(max_eps_values, dp_noise_scales, clipping_bounds, damping_vals))
 
-    _, _, exact_mean_pres, exact_pres = exact_inference(x_train, y_train, 2, experiment_setup['model_noise_std'] ** 2)
+    _, _, exact_mean_pres, exact_pres = exact_inference(x_train, y_train, 1, experiment_setup['model_noise_std'] ** 2)
 
     experiment_setup['exact_mean_pres'] = exact_mean_pres
     experiment_setup['exact_pres'] = exact_pres

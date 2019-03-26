@@ -98,8 +98,8 @@ class Worker(object):
             self.accountant.log_moments_increment = log_moments
 
         self.keys = self.net.get_params()[0]
-        np.savetxt(log_path + "data/worker_{}_x.txt".format(worker_index), self.x_train)
-        np.savetxt(log_path + "data/worker_{}_y.txt".format(worker_index), self.y_train)
+        # np.savetxt(log_path + "data/worker_{}_x.txt".format(worker_index), self.x_train)
+        # np.savetxt(log_path + "data/worker_{}_y.txt".format(worker_index), self.y_train)
 
     def get_delta(self, params, damping=0):
         # apply params
@@ -204,7 +204,7 @@ def run_dp_analytical_pvi_sync(mean, seed, max_eps, N_train, x_train, y_train, m
         i += 1
 
         KL_loss = KL_Gaussians(current_params[0], current_params[1], exact_mean_pres, exact_pres)
-        tracker_i = [mean_delta[0], mean_delta[1], current_params[0], current_params[1], KL_loss, current_eps]
+        tracker_i = [sum_delta[0], sum_delta[1], current_params[0], current_params[1], KL_loss, current_eps]
         tracker_vals.append(tracker_i)
 
         # save to file, tracking stuff
