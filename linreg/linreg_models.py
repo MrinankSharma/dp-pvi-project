@@ -122,7 +122,7 @@ class LinReg_MFVI_analytic():
 
     def _create_params(self, prior_mean, prior_var):
         no_params = self.din
-        init_var = 2 * np.ones([no_params])
+        init_var = 1 * np.ones([no_params])
         init_mean = np.zeros([no_params])
         init_n2 = 1.0 / init_var
         init_n1 = init_mean / init_var

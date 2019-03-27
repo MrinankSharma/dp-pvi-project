@@ -42,17 +42,18 @@ if __name__ == "__main__":
         "mean": 2,
         "model_noise_std": 0.5,
         "N_dp_seeds": args.N_dp_seeds,
+        "prior_std": 5,
         "points_per_worker": 10,
         "tag": tag,
         "num_workers": no_workers,
-        "num_intervals": 500,
+        "num_intervals": 250,
+        "output_base_dir": output_base_dir
     }
 
     max_eps_values = [np.inf]
     dp_noise_scales = [1, 2, 3]
     clipping_bounds = [0.1, 0.3, 0.5, 0.7, 1, 2]
     damping_vals = [0.25, 0.5, 0.75, 0.9]
-    N_train = no_workers * experiment_setup['points_per_worker']
 
     if testing:
         max_eps_values = [np.inf]
@@ -60,7 +61,7 @@ if __name__ == "__main__":
         clipping_bounds = [1]
         damping_vals = [0.25]
         experiment_setup["N_dp_seeds"] = 1
-        experiment_setup["num_intervals"] = 5
+        experiment_setup["num_intervals"] = 250
         tag = 'testing'
         should_overwrite = True
 
@@ -70,7 +71,8 @@ if __name__ == "__main__":
     if experiment_setup['dataset'] == 'toy_1d':
         data_func = lambda idx, N: data.get_toy_1d_shard(idx, N, experiment_setup['data_type'],
                                                          experiment_setup['mean'], experiment_setup['model_noise_std'],
-                                                         N_train)
+                                                         experiment_setup['mean'] * experiment_setup[
+                                                             'points_per_worker'])
 
     workers_data = [data_func(w_i, no_workers) for w_i in range(no_workers)]
     x_train = np.array([[]])
@@ -81,7 +83,8 @@ if __name__ == "__main__":
 
     param_combinations = list(itertools.product(max_eps_values, dp_noise_scales, clipping_bounds, damping_vals))
 
-    _, _, exact_mean_pres, exact_pres = exact_inference(x_train, y_train, 1, experiment_setup['model_noise_std'] ** 2)
+    _, _, exact_mean_pres, exact_pres = exact_inference(x_train, y_train, experiment_setup['prior_std'],
+                                                        experiment_setup['model_noise_std'] ** 2)
 
     experiment_setup['exact_mean_pres'] = exact_mean_pres
     experiment_setup['exact_pres'] = exact_pres
@@ -138,12 +141,9 @@ if __name__ == "__main__":
 
             # start everything running...
             for ind, seed in enumerate(dp_seeds):
-                results = run_dp_analytical_pvi_sync.remote(experiment_setup['mean'], seed, max_eps, N_train,
-                                                            x_train, y_train, experiment_setup['model_noise_std'],
-                                                            workers_data,
-                                                            dp_noise_scale, no_workers, damping_val,
-                                                            experiment_setup['num_intervals'],
-                                                            clipping_bound, output_base_dir, log_moments)
+                results = run_dp_analytical_pvi_sync.remote(experiment_setup, seed, max_eps, workers_data,
+                                                            dp_noise_scale, damping_val, clipping_bound,
+                                                            log_moments)
                 results_objects.append((results, ind))
 
             # fetch one by one
@@ -187,8 +187,8 @@ if __name__ == "__main__":
             csv_file = open(csv_file_path, "a")
             csv_file.write(
                 "{},{},{:.4e},{},{},{},{:.4e},{},{:.4e}\n".format(max_eps, eps, eps_var, dp_noise_scale, clipping_bound,
-                                                              kl,
-                                                              kl_var, experiment_counter, damping_val))
+                                                                  kl,
+                                                                  kl_var, experiment_counter, damping_val))
             csv_file.close()
             experiment_counter += 1
         except Exception, e:

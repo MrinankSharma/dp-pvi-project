@@ -40,6 +40,7 @@ if __name__ == "__main__":
         "data_type": 'homous',
         "mean": 2,
         "model_noise_std": 0.5,
+        "prior_std": 5,
         "N_dp_seeds": 10,
         "points_per_worker": 10,
         "tag": tag,
