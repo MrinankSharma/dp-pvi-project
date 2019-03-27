@@ -6,11 +6,11 @@ import argparse
 import time
 import numpy as np
 import os
+import json
 
 import copy
 import ray
 import linreg.linreg_models as linreg_models
-import linreg.data as data
 import tensorflow as tf
 from linreg.moments_accountant import MomentsAccountantPolicy, MomentsAccountant
 from linreg.inference_utils import save_predictive_plot, exact_inference, KL_Gaussians
@@ -52,7 +52,6 @@ class ParameterServer(object):
         self.conv_thres = conv_thres
         self.param_it_count = 0.0
 
-
     def push(self, keys, values):
         updates = {}
         orig_vals = {}
@@ -93,7 +92,7 @@ class ParameterServer(object):
 @ray.remote
 class Worker(object):
     def __init__(
-            self, worker_index, no_workers, din, worker_data, log_path, noise_var=1):
+            self, no_workers, din, worker_data, prior_var, noise_var=1):
         # get data for this worker
         self.x_train = worker_data[0]
         self.y_train = worker_data[1]
@@ -106,8 +105,6 @@ class Worker(object):
             no_workers=no_workers)
 
         self.keys = self.net.get_params()[0]
-        # np.savetxt(log_path + "data/worker_{}_x.txt".format(worker_index), self.x_train)
-        # np.savetxt(log_path + "data/worker_{}_y.txt".format(worker_index), self.y_train)
 
     def get_delta(self, params, damping=0.5):
         # apply params
@@ -173,25 +170,22 @@ def compute_update(keys, deltas, clipping_bound, noise_scale, method='sum'):
 
 
 @ray.remote
-def run_global_dp_analytical_pvi_sync(mean, seed, max_eps, N_total, all_workers_data, x_train, y_train, model_noise_std,
-                                      dp_noise_scale, no_workers, damping, no_intervals, clipping_bound,
-                                      output_base_dir='', log_moments=None, update_method = 'sum'):
+def run_global_dp_analytical_pvi_sync(experiment_setup, mean, seed, max_eps, all_workers_data, dp_noise_scale, damping,
+                                      clipping_bound, log_moments=None):
     np.random.seed(seed)
     tf.set_random_seed(seed)
 
-    n_train_master = N_total
+    n_train_master = experiment_setup['num_workers'] * experiment_setup['points_per_worker']
     in_dim = 1
 
     accountant = MomentsAccountant(MomentsAccountantPolicy.FIXED_DELTA_MAX_EPS, 1e-5, max_eps, 32)
-    net = linreg_models.LinReg_MFVI_analytic(in_dim, n_train_master, noise_var=model_noise_std ** 2)
-
-    _, _, exact_mean_pres, exact_pres = exact_inference(x_train, y_train, net.prior_var_num, model_noise_std ** 2)
-    print("Exact Inference Params: {}, {}".format(exact_mean_pres, exact_pres))
+    net = linreg_models.LinReg_MFVI_analytic(in_dim, n_train_master, noise_var=experiment_setup['model_noise_std'] ** 2,
+                                             prior_var=experiment_setup['prior_std'] ** 2)
 
     if log_moments is None:
         # accountant is not important here...
         # print('calculating log moments')
-        accountant.log_moments_increment = generate_log_moments(no_workers, 32, dp_noise_scale, no_workers)
+        accountant.log_moments_increment = generate_log_moments(1, 32, dp_noise_scale, 1)
     else:
         # print('reusing log moments')
         accountant.log_moments_increment = log_moments
@@ -200,63 +194,51 @@ def run_global_dp_analytical_pvi_sync(mean, seed, max_eps, N_total, all_workers_
     all_keys, all_values = net.get_params()
     ps = ParameterServer.remote(all_keys, all_values)
 
-    timestr = time.strftime("%m-%d;%H:%M:%S")
-    timestr = timestr + "-s-" + str(seed)
-    path = output_base_dir
-    path = path + 'logs/global_dp_analytical_sync_pvi/' + timestr + '/'
-    os.makedirs(path + "data/")
+    path = experiment_setup['output_base_dir'] + 'logs/global_dp_analytical_sync_pvi/' + time.strftime(
+        "%m-%d;%H:%M:%S") + "-s-" + str(seed) + '/'
     # create workers
     workers = [
-        Worker.remote(i, no_workers, in_dim, all_workers_data[i], path, model_noise_std ** 2)
-        for i in range(no_workers)]
+        Worker.remote(i, experiment_setup['num_workers'], in_dim, all_workers_data[i],
+                      experiment_setup['prior_std'] ** 2, experiment_setup['model_noise_std'] ** 2)
+        for i in range(experiment_setup['num_workers'])]
     i = 0
     current_params = ray.get(ps.pull.remote(all_keys))
 
     if not os.path.exists(path):
         os.makedirs(path)
 
-    N_train_worker = all_workers_data[0][0].shape[0]
-    names = ["N_train_worker",
-             "Num_workers", "mean", "noise_var"]
-    params_save = []
-    params_save.append(N_train_worker)
-    params_save.append(no_workers)
-    params_save.append(mean)
-    params_save.append(model_noise_std ** 2)
-    param_file = path + 'settings.txt'
-    text_file = open(param_file, "w")
-    text_file.write('Parameters\n')
-    for i in range(len(names)):
-        text_file.write('{} : {:.2e} \n'.format(names[i], params_save[i]))
-    text_file.write('Exact Inference (Non-PVI)\n')
-    text_file.write("Params: {}, {}\n".format(exact_mean_pres, exact_pres))
-    text_file.write("Update Method: {}\n".format(update_method))
-    text_file.close()
+    run_data = {
+        "c": clipping_bound,
+        "dp_noise_scale": dp_noise_scale,
+        "damping": damping,
+        "max_eps": max_eps,
+    }
+    logging_dict = copy.deepcopy(experiment_setup)
+    logging_dict.update(run_data)
+    setup_file = path + 'run-params.json'
+    with open(setup_file, 'w') as outfile:
+        json.dump(logging_dict, outfile)
 
-    tracker_file = path + 'params.txt'
     tracker_vals = []
 
-    while i < no_intervals:
+    while i < experiment_setup['num_intervals']:
         deltas = [
             worker.get_delta.remote(
                 current_params, damping=damping)
             for worker in workers]
-        true_sum_delta = compute_true_update(all_keys, ray.get(deltas), update_method)
-        sum_delta = compute_update(all_keys, ray.get(deltas), clipping_bound, dp_noise_scale, update_method)
+        true_sum_delta = compute_true_update(all_keys, ray.get(deltas))
+        sum_delta = compute_update(all_keys, ray.get(deltas), clipping_bound, dp_noise_scale)
         should_stop_priv = accountant.update_privacy_budget()
         current_eps = accountant.current_tracked_val
         ps.push.remote(all_keys, sum_delta)
         current_params = ray.get(ps.pull.remote(all_keys))
-        KL_loss = KL_Gaussians(current_params[0], current_params[1], exact_mean_pres, exact_pres)
+        KL_loss = KL_Gaussians(current_params[0], current_params[1], experiment_setup['exact_mean_pres'],
+                               experiment_setup['exact_pres'])
         tracker_i = [sum_delta[0], sum_delta[1], current_params[0], current_params[1], KL_loss, current_eps,
                      true_sum_delta[0], true_sum_delta[1]]
         tracker_vals.append(tracker_i)
         print("Interval {} done: {}".format(i, current_params))
         i += 1
-
-        # save to file, tracking stuff
-        with open(tracker_file, 'a') as file:
-            file.write("{} {}\n".format(current_params[0], current_params[1]))
 
         if ray.get(ps.get_should_stop.remote()):
             # break from the while loop if we should stop, convergence wise.
@@ -267,68 +249,13 @@ def run_global_dp_analytical_pvi_sync(mean, seed, max_eps, N_total, all_workers_
             print("Exceeded Privacy Budget - stop training")
             break
 
-    meanpres = current_params[0]
-    pres = current_params[1]
-    var = 1 / pres
-    mean = meanpres / pres
     eps = accountant.current_tracked_val
-    plot_title = "({:.3e}, {:.3e})-DP".format(eps, 1e-5)
 
     # save_predictive_plot(path + 'pred.png', x_train, y_train, mean, var, model_noise_std ** 2, plot_title)
     # compute KL(q||p)
-    KL_loss = KL_Gaussians(current_params[0], current_params[1], exact_mean_pres, exact_pres)
-    print(plot_title)
-    print(KL_loss)
+    KL_loss = KL_Gaussians(current_params[0], current_params[1], experiment_setup['exact_mean_pres'],
+                           experiment_setup['exact_pres'])
 
     tracker_array = np.array(tracker_vals)
+    np.savetxt(path + 'tracker.csv', tracker_array, delimiter=',')
     return eps, KL_loss, tracker_array
-
-
-if __name__ == "__main__":
-    ray.init()
-    args = parser.parse_args()
-
-    # load required arguments
-    damping_args = args.damping
-    data_type_args = args.data_type
-    seed_args = args.seed
-    no_intervals_args = args.no_intervals
-    no_workers_args = args.num_workers
-    dataset_args = args.data
-    noise_std_args = args.noise_std
-    mean_args = args.mean
-    dp_noise_scale_args = args.dp_noise_scale
-    clipping_bound_args = args.clipping_bound
-    redis_address_args = args.redis_address
-
-    N_train = 50
-
-    # param_file = args.param_file
-    #
-    # with open(param_file) as f:
-    #     dpsgd_params = json.load(f)['dpsgd_params']
-    #
-    # dpsgd_C = dpsgd_params['C']
-    # dpsgd_L = dpsgd_params['L']
-    # dpsgd_sigma = dpsgd_params['sigma']
-
-    np.random.seed(seed_args)
-    tf.set_random_seed(seed_args)
-
-    if dataset_args == 'toy_1d':
-        data_func = lambda idx, N: data.get_toy_1d_shard(idx, N, data_type_args, mean_args, noise_std_args, N_train)
-
-    # Create a parameter server with some random params.
-    x_train, y_train, x_test, y_test = data_func(0, 1)
-
-    all_workers_data = [data_func(w_i, no_workers_args) for w_i in range(no_workers_args)]
-
-    clipping_bound_args = 1e4
-    eps_max = 1e5
-    noise = 1e-8
-    # run on a seperate thread
-    ray.get(run_global_dp_analytical_pvi_sync.remote(mean_args, seed_args, np.inf, N_train, all_workers_data,
-                                                     x_train, y_train, noise_std_args,
-                                                     data_func, dp_noise_scale_args, no_workers_args, damping_args,
-                                                     no_intervals_args,
-                                                     clipping_bound_args))

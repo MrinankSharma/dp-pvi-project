@@ -132,7 +132,7 @@ def run_dp_analytical_pvi_sync(experiment_setup, seed, max_eps, all_workers_data
     np.random.seed(seed)
     tf.set_random_seed(seed)
 
-    n_train_master = N_train
+    n_train_master = experiment_setup['num_workers'] * experiment_setup['points_per_worker']
 
     in_dim = 1
     accountant = MomentsAccountant(MomentsAccountantPolicy.FIXED_DELTA, 1e-5, max_eps, 32)
@@ -170,7 +170,7 @@ def run_dp_analytical_pvi_sync(experiment_setup, seed, max_eps, all_workers_data
     }
     logging_dict = copy.deepcopy(experiment_setup)
     logging_dict.update(run_data)
-    setup_file = path + 'setup.json'
+    setup_file = path + 'run-params.json'
     with open(setup_file, 'w') as outfile:
         json.dump(logging_dict, outfile)
 
@@ -207,44 +207,6 @@ def run_dp_analytical_pvi_sync(experiment_setup, seed, max_eps, all_workers_data
 
     print("KL: {}".format(KL_loss))
     tracker_array = np.array(tracker_vals)
-    np.savetxt(path + 'tracker.csv')
+    np.savetxt(path + 'tracker.csv', tracker_array, delimiter=',')
 
     return eps, KL_loss, tracker_array
-
-
-if __name__ == "__main__":
-    args = parser.parse_args()
-
-    # load required arguments
-    damping_args = args.damping
-    data_type_args = args.data_type
-    seed_args = args.seed
-    no_intervals_args = args.no_intervals
-    no_workers_args = args.num_workers
-    dataset_args = args.data
-    noise_std_args = args.noise_std
-    mean_args = args.mean
-
-    N_train = 500
-
-    ray.init(redis_address=args.redis_address, redirect_worker_output=False, redirect_output=False)
-
-    np.random.seed(seed_args)
-    tf.set_random_seed(seed_args)
-
-    if dataset_args == 'toy_1d':
-        data_func = lambda idx, N: data.get_toy_1d_shard(idx, N, data_type_args, mean_args, noise_std_args, N_train)
-
-    # Create a parameter server with some random params.
-    x_train, y_train, x_test, y_test = data_func(0, 1)
-    L = 10
-
-    all_worker_data = [data_func(i, no_workers_args) for i in range(no_workers_args)]
-
-    max_eps = np.inf
-    noise_scale = 0.0000001
-    c = 10000
-    ray.get(
-        run_dp_analytical_pvi_sync.remote(mean_args, seed_args, max_eps, N_train, noise_std_args, all_worker_data,
-                                          noise_scale, no_workers_args, damping_args, no_intervals_args,
-                                          c, L))

@@ -164,31 +164,17 @@ if __name__ == "__main__":
             eps_var = np.var(eps_i)
             kl_var = np.var(kl_i)
 
-            if kl < min_kl:
-                # print('New Min KL: {}'.format(kl))
-                # print(param_combination)
-                min_kl = kl
-
             # print(log_file)
             # print('logging!')
             text_file = open(log_file_path, "a")
+            results_array = [eps, eps_var, dp_noise_scale, clipping_bound, kl, kl_var, experiment_counter, damping_val]
             text_file.write(
-                "max_eps: {} eps: {} eps_var: {:.4e} dp_noise: {} c: {} kl: {} kl_var: {:.4e} experiment_counter:{} damping:{}\n".format(
-                    max_eps,
-                    eps,
-                    eps_var,
-                    dp_noise_scale,
-                    clipping_bound,
-                    kl,
-                    kl_var,
-                    experiment_counter,
-                    damping_val))
+                """max_eps: {} eps: {} eps_var: {:.4e} dp_noise: {} c: {} kl: {}
+                kl_var: {:.4e} experiment_counter:{} damping:{}\n""".format(*results_array))
             text_file.close()
             csv_file = open(csv_file_path, "a")
             csv_file.write(
-                "{},{},{:.4e},{},{},{},{:.4e},{},{:.4e}\n".format(max_eps, eps, eps_var, dp_noise_scale, clipping_bound,
-                                                                  kl,
-                                                                  kl_var, experiment_counter, damping_val))
+                "{},{},{:.4e},{},{},{},{:.4e},{},{:.4e}\n".format(*results_array))
             csv_file.close()
             experiment_counter += 1
         except Exception, e:
