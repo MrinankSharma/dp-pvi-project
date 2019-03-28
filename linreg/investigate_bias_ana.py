@@ -57,6 +57,17 @@ def generate_datasets(experiment_setup):
     return datasets, exact_params, combinations
 
 
+def model_config_to_int(model_config):
+    if model_config == "not_clipped_not_noisy":
+        return 0
+    elif model_config == "clipped_not_noisy":
+        return 10
+    elif model_config == "not_clipped_noisy":
+        return 1
+    elif model_config == "clipped_not_noisy":
+        return 11
+
+
 if __name__ == "__main__":
     args = parser.parse_args()
     output_base_dir = args.output_base_dir
@@ -158,14 +169,19 @@ if __name__ == "__main__":
                 # print(log_file)
                 # print('logging!')
                 text_file = open(log_file_path, "a")
-                results_array = [eps, eps_var, kl, kl_var, experiment_counter]
+                results_array_txt = [eps, eps_var, kl, kl_var, experiment_counter, model_config,
+                                     combinations[dataset_indx],
+                                     exact_params[dataset_indx][0], exact_params[dataset_indx][0]]
+                results_array_csv = [eps, eps_var, kl, kl_var, experiment_counter, model_config_to_int(model_config),
+                                     combinations[dataset_indx],
+                                     exact_params[dataset_indx][0], exact_params[dataset_indx][0]]
                 text_file.write(
-                    """max_eps: {} eps: {} eps_var: {:.4e} dp_noise: {} c: {} kl: {}
-                    kl_var: {:.4e} experiment_counter:{} damping:{}\n""".format(*results_array))
+                    """eps: {} eps_var: {:.4e} kl: {} kl_var: {:.4e} experiment_counter:{}
+                     model_config: {}, mean: {}, exact_mean_pres: {.4e}, exact_pres: {.4e}\n""".format(*results_array_txt))
                 text_file.close()
                 csv_file = open(csv_file_path, "a")
                 csv_file.write(
-                    "{},{},{:.4e},{},{},{},{:.4e},{},{:.4e}\n".format(*results_array))
+                    "{},{:.4e},{.4e},{:.4e},{},{},{},{},{}\n".format(*results_array_csv))
                 csv_file.close()
                 experiment_counter += 1
             except Exception, e:
