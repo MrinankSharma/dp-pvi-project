@@ -35,9 +35,9 @@ def generate_datasets(experiment_setup):
     combinations = []
     for mean_val in dataset_setup["mean_vals"]:
         if dataset_setup['dataset'] == 'toy_1d':
-            data_func = lambda idx, N: data.get_toy_1d_shard(idx, N, experiment_setup['data_type'],
+            data_func = lambda idx, N: data.get_toy_1d_shard(idx, N, dataset_setup['data_type'],
                                                              mean_val,
-                                                             experiment_setup['model_noise_std'],
+                                                             dataset_setup['model_noise_std'],
                                                              experiment_setup['num_workers'] * dataset_setup[
                                                                  'points_per_worker'])
 
@@ -49,7 +49,7 @@ def generate_datasets(experiment_setup):
             y_train = np.append(y_train, worker_data[1])
 
         _, _, exact_mean_pres, exact_pres = exact_inference(x_train, y_train, experiment_setup['prior_std'],
-                                                            experiment_setup['model_noise_std'] ** 2)
+                                                            dataset_setup['model_noise_std'] ** 2)
         exact_params.append([exact_mean_pres, exact_pres])
         datasets.append(workers_data)
         combinations.append(mean_val)
@@ -98,17 +98,17 @@ if __name__ == "__main__":
     }
 
     if testing:
-        experiment_setup['mean_vals'] = [1]
         experiment_setup["N_dp_seeds"] = 1
+        experiment_setup["dataset"]["mean_vals"] = [2]
         tag = 'testing'
         should_overwrite = True
 
     np.random.seed(experiment_setup['seed'])
     tf.set_random_seed(experiment_setup['seed'])
 
-    timestr = time.strftime("%m-%d;%H:%M:%S")
     path = output_base_dir
-    path = output_base_dir + 'logs/gs_local_ana/' + tag + '/'
+    path = output_base_dir + 'logs/gs_local_bias_ana/' + tag + '/'
+
     try:
         os.makedirs(path)
     except OSError:
@@ -121,7 +121,6 @@ if __name__ == "__main__":
         json.dump(experiment_setup, outfile)
 
     dp_seeds = np.arange(1, experiment_setup['N_dp_seeds'] + 1)
-    min_kl = 10000
     ray.init()
 
     datasets, exact_params, combinations = generate_datasets(experiment_setup)
@@ -133,6 +132,9 @@ if __name__ == "__main__":
             try:
                 model_config = param_combination[0]
 
+                print("Running for: mean: {} model_config: {}".format(combinations[dataset_indx], model_config))
+                print("Exact Inference Params: {}".format(exact_params[dataset_indx]))
+
                 eps_i = np.zeros(experiment_setup['N_dp_seeds'])
                 kl_i = np.zeros(experiment_setup['N_dp_seeds'])
 
@@ -143,9 +145,9 @@ if __name__ == "__main__":
                 for ind, seed in enumerate(dp_seeds):
                     results = run_dp_analytical_pvi_sync.remote(experiment_setup, seed, experiment_setup['max_eps'],
                                                                 dataset, experiment_setup['dp_noise_scale'],
-                                                                experiment_setup['damping_val'],
+                                                                experiment_setup['damping'],
                                                                 experiment_setup['clipping_bound'], model_config,
-                                                                log_moments)
+                                                                exact_params[dataset_indx], log_moments)
                     results_objects.append((results, ind))
 
                 # fetch one by one
@@ -166,8 +168,6 @@ if __name__ == "__main__":
                 eps_var = np.var(eps_i)
                 kl_var = np.var(kl_i)
 
-                # print(log_file)
-                # print('logging!')
                 text_file = open(log_file_path, "a")
                 results_array_txt = [eps, eps_var, kl, kl_var, experiment_counter, model_config,
                                      combinations[dataset_indx],
@@ -177,11 +177,12 @@ if __name__ == "__main__":
                                      exact_params[dataset_indx][0], exact_params[dataset_indx][0]]
                 text_file.write(
                     """eps: {} eps_var: {:.4e} kl: {} kl_var: {:.4e} experiment_counter:{}
-                     model_config: {}, mean: {}, exact_mean_pres: {.4e}, exact_pres: {.4e}\n""".format(*results_array_txt))
+                     model_config: {}, mean: {}, exact_mean_pres: {:.4e}, exact_pres: {:.4e}\n""".format(
+                        *results_array_txt))
                 text_file.close()
                 csv_file = open(csv_file_path, "a")
                 csv_file.write(
-                    "{},{:.4e},{.4e},{:.4e},{},{},{},{},{}\n".format(*results_array_csv))
+                    "{},{},{},{},{},{},{},{},{}\n".format(*results_array_csv))
                 csv_file.close()
                 experiment_counter += 1
             except Exception, e:

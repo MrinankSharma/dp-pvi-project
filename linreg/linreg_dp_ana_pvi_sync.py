@@ -128,17 +128,17 @@ def compute_update(keys, deltas, method='sum'):
 
 @ray.remote
 def run_dp_analytical_pvi_sync(experiment_setup, seed, max_eps, all_workers_data, dp_noise_scale,
-                               damping, clipping_bound, model_config='clipped_noisy', log_moments=None):
+                               damping, clipping_bound, model_config='clipped_noisy', exact_params = None, log_moments=None):
     np.random.seed(seed)
     tf.set_random_seed(seed)
 
-    n_train_master = experiment_setup['num_workers'] * experiment_setup['points_per_worker']
+    n_train_master = experiment_setup['num_workers'] * experiment_setup['dataset']['points_per_worker']
 
     in_dim = 1
     accountant = MomentsAccountant(MomentsAccountantPolicy.FIXED_DELTA, 1e-5, max_eps, 32)
     net = linreg_models.LinReg_MFVI_DP_analytic(in_dim, n_train_master, accountant,
                                                 prior_var=experiment_setup['prior_std'] ** 2,
-                                                noise_var=experiment_setup['model_noise_std'] ** 2)
+                                                noise_var=experiment_setup['dataset']['model_noise_std'] ** 2)
 
     # accountant is not important here...
     accountant.log_moments_increment = np.ones(32)
@@ -149,7 +149,7 @@ def run_dp_analytical_pvi_sync(experiment_setup, seed, max_eps, all_workers_data
     # create workers
     workers = [
         Worker.remote(experiment_setup['num_workers'], in_dim, all_workers_data[i], max_eps, dp_noise_scale,
-                      clipping_bound, experiment_setup['model_noise_std'] ** 2, experiment_setup['prior_std'] ** 2,
+                      clipping_bound, experiment_setup['dataset']['model_noise_std'] ** 2, experiment_setup['prior_std'] ** 2,
                       model_config, log_moments)
         for i in range(experiment_setup['num_workers'])]
     i = 0
@@ -190,8 +190,12 @@ def run_dp_analytical_pvi_sync(experiment_setup, seed, max_eps, all_workers_data
         print("Interval {} done: {}".format(i, current_params))
         i += 1
 
-        KL_loss = KL_Gaussians(current_params[0], current_params[1], experiment_setup['exact_mean_pres'],
-                               experiment_setup['exact_pres'])
+        if exact_params == None:
+            KL_loss = KL_Gaussians(current_params[0], current_params[1], experiment_setup['exact_mean_pres'],
+                                   experiment_setup['exact_pres'])
+        else:
+            KL_loss = KL_Gaussians(current_params[0], current_params[1], exact_params[0], exact_params[1])
+
         tracker_i = [sum_delta[0], sum_delta[1], current_params[0], current_params[1], KL_loss, current_eps]
         tracker_vals.append(tracker_i)
 
@@ -203,8 +207,11 @@ def run_dp_analytical_pvi_sync(experiment_setup, seed, max_eps, all_workers_data
     eps = workers[0].get_privacy_spent.remote()
     eps = ray.get(eps)
     # compute KL(q||p)
-    KL_loss = KL_Gaussians(current_params[0], current_params[1], experiment_setup['exact_mean_pres'],
-                           experiment_setup['exact_pres'])
+    if exact_params == None:
+        KL_loss = KL_Gaussians(current_params[0], current_params[1], experiment_setup['exact_mean_pres'],
+                               experiment_setup['exact_pres'])
+    else:
+        KL_loss = KL_Gaussians(current_params[0], current_params[1], exact_params[0], exact_params[1])
 
     print("KL: {}".format(KL_loss))
     tracker_array = np.array(tracker_vals)
