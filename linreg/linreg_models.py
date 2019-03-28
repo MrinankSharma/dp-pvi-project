@@ -1181,7 +1181,7 @@ class LinReg_MFVI_DP_analytic():
         elif self.model_config == "clipped_not_noisy":
             xTx_noisy, xTy_noisy = tf.py_func(self.clip_sum_values, [xTx_i, xTy_i], (float_type, float_type))
         elif self.model_config == "not_clipped_noisy":
-            xTx = tf.math.reduce_sum(xTy_i)
+            xTx = tf.math.reduce_sum(xTx_i)
             xTy = tf.math.reduce_sum(xTy_i)
             noise = self.noise_dist.sample()
             xTx_noisy = tf.reshape(xTx + tf.cast(noise[0], dtype=float_type), [1])
