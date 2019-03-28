@@ -34,7 +34,6 @@ if __name__ == "__main__":
     testing = args.testing
     tag = args.tag
     no_workers = args.no_workers
-
     experiment_setup = {
         "seed": 42,
         "dataset": 'toy_1d',
@@ -71,7 +70,7 @@ if __name__ == "__main__":
     if experiment_setup['dataset'] == 'toy_1d':
         data_func = lambda idx, N: data.get_toy_1d_shard(idx, N, experiment_setup['data_type'],
                                                          experiment_setup['mean'], experiment_setup['model_noise_std'],
-                                                         experiment_setup['mean'] * experiment_setup[
+                                                         experiment_setup['num_workers'] * experiment_setup[
                                                              'points_per_worker'])
 
     workers_data = [data_func(w_i, no_workers) for w_i in range(no_workers)]

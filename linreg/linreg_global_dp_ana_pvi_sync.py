@@ -13,7 +13,7 @@ import ray
 import linreg.linreg_models as linreg_models
 import tensorflow as tf
 from linreg.moments_accountant import MomentsAccountantPolicy, MomentsAccountant
-from linreg.inference_utils import save_predictive_plot, exact_inference, KL_Gaussians
+from linreg.inference_utils import KL_Gaussians
 from linreg.log_moment_utils import generate_log_moments
 
 parser = argparse.ArgumentParser(description="synchronous distributed variational training.")
@@ -251,8 +251,6 @@ def run_global_dp_analytical_pvi_sync(experiment_setup, mean, seed, max_eps, all
 
     eps = accountant.current_tracked_val
 
-    # save_predictive_plot(path + 'pred.png', x_train, y_train, mean, var, model_noise_std ** 2, plot_title)
-    # compute KL(q||p)
     KL_loss = KL_Gaussians(current_params[0], current_params[1], experiment_setup['exact_mean_pres'],
                            experiment_setup['exact_pres'])
 

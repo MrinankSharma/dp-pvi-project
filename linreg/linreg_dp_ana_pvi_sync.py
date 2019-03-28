@@ -78,7 +78,7 @@ class ParameterServer(object):
 class Worker(object):
     def __init__(
             self, no_workers, din, worker_data, max_eps, dp_noise, c, noise_var=1, prior_var=1,
-            log_moments=None):
+            model_config="clipped_noisy", log_moments=None):
         # get data for this worker
         self.x_train = worker_data[0]
         self.y_train = worker_data[1]
@@ -88,7 +88,7 @@ class Worker(object):
         self.accountant = MomentsAccountant(MomentsAccountantPolicy.FIXED_DELTA_MAX_EPS, 1e-5, max_eps, 32)
         self.net = linreg_models.LinReg_MFVI_DP_analytic(
             din, n_train_worker, self.accountant, noise_var=noise_var, no_workers=no_workers, clipping_bound=c,
-            dp_noise_scale=dp_noise, prior_var = prior_var)
+            dp_noise_scale=dp_noise, prior_var=prior_var, model_config=model_config)
 
         if log_moments is None:
             self.accountant.log_moments_increment = self.net.generate_log_moments(n_train_worker, 32)
@@ -128,7 +128,7 @@ def compute_update(keys, deltas, method='sum'):
 
 @ray.remote
 def run_dp_analytical_pvi_sync(experiment_setup, seed, max_eps, all_workers_data, dp_noise_scale,
-                               damping, clipping_bound, log_moments=None):
+                               damping, clipping_bound, model_config='clipped_noisy', log_moments=None):
     np.random.seed(seed)
     tf.set_random_seed(seed)
 
@@ -150,7 +150,7 @@ def run_dp_analytical_pvi_sync(experiment_setup, seed, max_eps, all_workers_data
     workers = [
         Worker.remote(experiment_setup['num_workers'], in_dim, all_workers_data[i], max_eps, dp_noise_scale,
                       clipping_bound, experiment_setup['model_noise_std'] ** 2, experiment_setup['prior_std'] ** 2,
-                      log_moments)
+                      model_config, log_moments)
         for i in range(experiment_setup['num_workers'])]
     i = 0
     current_params = ray.get(ps.pull.remote(all_keys))
@@ -167,6 +167,7 @@ def run_dp_analytical_pvi_sync(experiment_setup, seed, max_eps, all_workers_data
         "dp_noise_scale": dp_noise_scale,
         "damping": damping,
         "max_eps": max_eps,
+        "model_config": model_config,
     }
     logging_dict = copy.deepcopy(experiment_setup)
     logging_dict.update(run_data)

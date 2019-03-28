@@ -1092,7 +1092,7 @@ class LinReg_MFVI_DP_analytic():
     def __init__(self, din, n_train, accountant, noise_var=1,
                  prior_mean=0.0, prior_var=1.0,
                  no_workers=1, clipping_bound=10,
-                 dp_noise_scale=0.01, L=1000, single_thread=True):
+                 dp_noise_scale=0.01, L=1000, model_config="clipped_noisy", single_thread=True):
         self.din = din
         # input and output placeholders
         self.xtrain = tf.placeholder(float_type, [None, din], 'input')
@@ -1101,6 +1101,7 @@ class LinReg_MFVI_DP_analytic():
         self.n_train = n_train
         self.no_workers = no_workers
         self.noise_var = noise_var
+        self.model_config = model_config
 
         self.accountant = accountant
 
@@ -1149,7 +1150,7 @@ class LinReg_MFVI_DP_analytic():
 
     def get_params_for_logging(self):
         # we want to save the dpsgd parameters we are gonna use
-        return [self.clipping_bound , self.dp_noise_scale, self.lot_size]
+        return [self.clipping_bound, self.dp_noise_scale, self.lot_size]
 
     def select_lot(self, lot_size, x, y):
         # select lot to perform SGD on
@@ -1168,27 +1169,28 @@ class LinReg_MFVI_DP_analytic():
         return clipped_mean_vals.astype(np.float32), clipped_var_vals.astype(np.float32)
 
     def _create_train_step(self):
-        red = tf.py_func(self.select_lot, [self.lot_size, self.xtrain, self.ytrain], (float_type, float_type))
         L = self.lot_size
         # use shape operator, because the shape is able to vary at runtime
-        N = tf.shape(self.xtrain)[0]
 
-        x_red = red[0]
-        y_red = red[1]
+        xTx_i = tf.einsum('na,na->n', self.xtrain, self.xtrain)
+        xTy_i = tf.einsum('na,n->n', self.xtrain, self.ytrain)
 
-        # set shapes - we know that the reduced input versions will be of this shape (by definition)
-        x_red.set_shape([L, 1])
-        y_red.set_shape([L])
-
-        xTx_i = tf.einsum('na,na->n', x_red, x_red)
-        xTy_i = tf.einsum('na,n->n', x_red, y_red)
-
-        xTx_cs, xTy_cs = tf.py_func(self.clip_sum_values, [xTx_i, xTy_i], (float_type, float_type))
-
-        noise = self.noise_dist.sample()
-        xTx_noisy = tf.reshape(xTx_cs + tf.cast(noise[0], dtype=float_type), [1])
-        # rescale as parameterised in terms of the log of the variance since the variance must remain positive
-        xTy_noisy = tf.reshape((xTy_cs + tf.cast(noise[1], dtype=float_type)), [1])
+        if self.model_config == "not_clipped_not_noisy":
+            xTx_noisy = tf.math.reduce_sum(xTy_i)
+            xTy_noisy = tf.math.reduce_sum(xTy_i)
+        elif self.model_config == "clipped_not_noisy":
+            xTx_noisy, xTy_noisy = tf.py_func(self.clip_sum_values, [xTx_i, xTy_i], (float_type, float_type))
+        elif self.model_config == "not_clipped_noisy":
+            xTx = tf.math.reduce_sum(xTy_i)
+            xTy = tf.math.reduce_sum(xTy_i)
+            noise = self.noise_dist.sample()
+            xTx_noisy = tf.reshape(xTx + tf.cast(noise[0], dtype=float_type), [1])
+            xTy_noisy = tf.reshape((xTy + tf.cast(noise[1], dtype=float_type)), [1])
+        elif self.model_config == "clipped_noisy":
+            xTx_cs, xTy_cs = tf.py_func(self.clip_sum_values, [xTx_i, xTy_i], (float_type, float_type))
+            noise = self.noise_dist.sample()
+            xTx_noisy = tf.reshape(xTx_cs + tf.cast(noise[0], dtype=float_type), [1])
+            xTy_noisy = tf.reshape((xTy_cs + tf.cast(noise[1], dtype=float_type)), [1])
 
         Voinv = tf.diag(1.0 / self.prior_var)
         Voinvmo = self.prior_mean / self.prior_var
@@ -1407,4 +1409,3 @@ class LinReg_MFVI_DP_analytic():
 
     def generate_log_moments(self, N, max_lambda):
         return generate_log_moments(N, max_lambda, self.dp_noise_scale, self.lot_size)
-
