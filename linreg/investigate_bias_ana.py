@@ -64,7 +64,7 @@ def model_config_to_int(model_config):
         return 10
     elif model_config == "not_clipped_noisy":
         return 1
-    elif model_config == "clipped_not_noisy":
+    elif model_config == "clipped_noisy":
         return 11
 
 
