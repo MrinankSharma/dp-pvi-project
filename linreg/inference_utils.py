@@ -2,6 +2,8 @@ import numpy as np
 import matplotlib
 matplotlib.use('TkAgg')
 import matplotlib.pyplot as plt
+import itertools
+import copy
 
 def save_predictive_plot(filepath, x_train, y_train, pred_mean, pred_var, noise_var, title, max_val=5, grid_step = 0.01):
     grid_vals = np.arange(start=-max_val, stop=max_val, step=grid_step)
@@ -32,5 +34,37 @@ def KL_Gaussians(nat11, nat12, nat21, nat22):
     m2 = nat21/nat22
     KL = np.log(np.sqrt(v2/v1)) + (v1 + (m1-m2)**2)/(2*v2) - 0.5
     return KL
+
+
+def generateDictCombinations(setup):
+    keys_of_lists = []
+    keys_of_dicts = []
+    for key, value in setup.iteritems():
+        if isinstance(value, (list,)):
+            keys_of_lists.append(key)
+        elif isinstance(value, (dict,)):
+            keys_of_dicts.append(key)
+
+    list_combinations = [setup[k] for k in keys_of_lists]
+    sub_dict_combinations = []
+    for ind, dict_key in enumerate(keys_of_dicts):
+        sub_dict_combination = generateDictCombinations(setup[dict_key])
+        sub_dict_combinations.append(sub_dict_combination)
+
+    keys_of_lists.extend(keys_of_dicts);
+    list_combinations.extend(sub_dict_combinations)
+    all_keys = keys_of_lists
+    all_combinations = list_combinations
+    combinations_expanded = list(itertools.product(*all_combinations))
+    output_dictionaries = []
+
+    for ind, val in enumerate(combinations_expanded):
+        new_dict = copy.deepcopy(setup)
+        for key_ind, key_value in enumerate(all_keys):
+            new_dict[key_value] = val[key_ind]
+        output_dictionaries.append(new_dict)
+
+    return output_dictionaries
+
 
 

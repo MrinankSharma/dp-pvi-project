@@ -156,7 +156,7 @@ def run_dp_analytical_pvi_sync(experiment_setup, seed, max_eps, all_workers_data
     current_params = ray.get(ps.pull.remote(all_keys))
 
     # logging stuff
-    path = experiment_setup['output_base_dir'] + 'logs/dp_analytical_sync_pvi/' + time.strftime(
+    path = experiment_setup['output_base_dir'] + 'logs/dp_ana_sync_pvi/' + time.strftime(
         "%m-%d;%H:%M:%S") + "-s-" + str(seed) + '/'
 
     if not os.path.exists(path):

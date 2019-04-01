@@ -92,7 +92,7 @@ class ParameterServer(object):
 @ray.remote
 class Worker(object):
     def __init__(
-            self, no_workers, din, worker_data, prior_var, noise_var=1):
+            self, no_workers, din, worker_data, prior_var, model_config, clipping_bound, global_damping, noise_var=1):
         # get data for this worker
         self.x_train = worker_data[0]
         self.y_train = worker_data[1]
@@ -100,10 +100,9 @@ class Worker(object):
         # Initialize the model
         n_train_worker = self.x_train.shape[0]
         self.n_train = n_train_worker
-        self.net = linreg_models.LinReg_MFVI_analytic(
-            din, n_train_worker, noise_var=noise_var,
-            no_workers=no_workers)
-
+        self.net = linreg_models.LinReg_MFVI_analytic(din, n_train_worker, noise_var=noise_var, no_workers=no_workers,
+                                                      prior_var=prior_var, model_config=model_config,
+                                                      clipping_bound=clipping_bound, global_damping=global_damping)
         self.keys = self.net.get_params()[0]
 
     def get_delta(self, params, damping=0.5):
@@ -117,7 +116,7 @@ class Worker(object):
         return delta
 
 
-def add_noise_clip_delta(deltas, clipping_bound, noise_scale):
+def add_noise_clip_delta(deltas, clipping_bound, default_clipping_bound, noise_scale):
     no_delta = len(deltas)
     new_deltas = []
     for i in range(no_delta):
@@ -129,39 +128,28 @@ def add_noise_clip_delta(deltas, clipping_bound, noise_scale):
         new_delta = [deltas[i][0] * scaling, deltas[i][1] * scaling]
         new_deltas.append(new_delta)
 
-    noise = np.random.normal(0, noise_scale * clipping_bound, [2])
+    true_noise_scale = noise_scale * clipping_bound
+    true_noise_scale = 0 if np.isnan(true_noise_scale) else true_noise_scale
+    if clipping_bound == np.inf and noise_scale != 0:
+        true_noise_scale = default_clipping_bound * noise_scale
+
+    noise = np.random.normal(0, true_noise_scale, [2])
     # include the noise as part of the deltas
     new_deltas[0][0] = new_deltas[0][0] + noise[0]
     new_deltas[0][1] = new_deltas[0][1] + noise[1]
     return new_deltas
 
 
-def compute_true_update(keys, deltas, method='sum'):
+def compute_update(keys, deltas, global_clipping_bound, default_clipping_bound, global_damping, noise_scale, method='sum'):
     mean_delta = []
-    for i, key in enumerate(keys):
-        no_deltas = len(deltas)
-        for j in range(no_deltas):
-            if j == 0:
-                sum_delta = np.copy(deltas[j][i])
-            else:
-                sum_delta += deltas[j][i]
-        if method == 'sum':
-            mean_delta.append(sum_delta)
-        elif method == 'mean':
-            mean_delta.append(sum_delta / no_deltas)
-    return mean_delta
-
-
-def compute_update(keys, deltas, clipping_bound, noise_scale, method='sum'):
-    mean_delta = []
-    updated_deltas = add_noise_clip_delta(deltas, clipping_bound, noise_scale)
+    updated_deltas = add_noise_clip_delta(deltas, global_clipping_bound, default_clipping_bound, noise_scale)
     for i, key in enumerate(keys):
         no_deltas = len(updated_deltas)
         for j in range(no_deltas):
             if j == 0:
-                sum_delta = np.copy(updated_deltas[j][i])
+                sum_delta = (1 - global_damping) * np.copy(updated_deltas[j][i])
             else:
-                sum_delta += updated_deltas[j][i]
+                sum_delta += (1 - global_damping) * updated_deltas[j][i]
         if method == 'sum':
             mean_delta.append(sum_delta)
         elif method == 'mean':
@@ -170,72 +158,69 @@ def compute_update(keys, deltas, clipping_bound, noise_scale, method='sum'):
 
 
 @ray.remote
-def run_global_dp_analytical_pvi_sync(experiment_setup, mean, seed, max_eps, all_workers_data, dp_noise_scale, damping,
-                                      clipping_bound, log_moments=None):
-    np.random.seed(seed)
-    tf.set_random_seed(seed)
-
-    n_train_master = experiment_setup['num_workers'] * experiment_setup['points_per_worker']
-    in_dim = 1
-
-    accountant = MomentsAccountant(MomentsAccountantPolicy.FIXED_DELTA_MAX_EPS, 1e-5, max_eps, 32)
-    net = linreg_models.LinReg_MFVI_analytic(in_dim, n_train_master, noise_var=experiment_setup['model_noise_std'] ** 2,
-                                             prior_var=experiment_setup['prior_std'] ** 2)
-
-    if log_moments is None:
-        # accountant is not important here...
-        # print('calculating log moments')
-        accountant.log_moments_increment = generate_log_moments(1, 32, dp_noise_scale, 1)
-    else:
-        # print('reusing log moments')
-        accountant.log_moments_increment = log_moments
-
-    # accountant.log_moments_increment = net.generate_log_moments(n_train_master, 32)
-    all_keys, all_values = net.get_params()
-    ps = ParameterServer.remote(all_keys, all_values)
-
-    path = experiment_setup['output_base_dir'] + 'logs/global_dp_analytical_sync_pvi/' + time.strftime(
-        "%m-%d;%H:%M:%S") + "-s-" + str(seed) + '/'
-    # create workers
-    workers = [
-        Worker.remote(i, experiment_setup['num_workers'], in_dim, all_workers_data[i],
-                      experiment_setup['prior_std'] ** 2, experiment_setup['model_noise_std'] ** 2)
-        for i in range(experiment_setup['num_workers'])]
-    i = 0
-    current_params = ray.get(ps.pull.remote(all_keys))
-
+def run_global_dp_analytical_pvi_sync(experiment_setup, seed, all_workers_data, log_moments=None):
+    # logging
+    path = experiment_setup['output_base_dir'] + 'logs/global_dp_ana_sync_pvi/' + time.strftime(
+        "%m-%d;%H:%M:%S") + "-s-" + str(experiment_setup["seed"]) + '/'
     if not os.path.exists(path):
         os.makedirs(path)
 
-    run_data = {
-        "c": clipping_bound,
-        "dp_noise_scale": dp_noise_scale,
-        "damping": damping,
-        "max_eps": max_eps,
-    }
-    logging_dict = copy.deepcopy(experiment_setup)
-    logging_dict.update(run_data)
     setup_file = path + 'run-params.json'
     with open(setup_file, 'w') as outfile:
-        json.dump(logging_dict, outfile)
+        json.dump(experiment_setup, outfile)
+
+    np.random.seed(seed)
+    tf.set_random_seed(seed)
+
+    n_train_master = experiment_setup['num_workers'] * experiment_setup['dataset']['points_per_worker']
+    in_dim = 1
+
+    accountant = MomentsAccountant(MomentsAccountantPolicy.FIXED_DELTA_MAX_EPS, 1e-5, experiment_setup['max_eps'], 32)
+    net = linreg_models.LinReg_MFVI_analytic(in_dim, n_train_master,
+                                             noise_var=experiment_setup['dataset']['model_noise_std'] ** 2,
+                                             prior_var=experiment_setup['prior_std'] ** 2)
+
+    if log_moments is None:
+        accountant.log_moments_increment = generate_log_moments(1, 32, experiment_setup['dp_noise_scale'], 1)
+    else:
+        accountant.log_moments_increment = log_moments
+
+    all_keys, all_values = net.get_params()
+    ps = ParameterServer.remote(all_keys, all_values)
+
+    worker_model_config = "not_clipped" if (experiment_setup["clipping_config"] == "not_clipped" or experiment_setup[
+        "clipping_config"] == "clipped_server") else "clipped"
+
+    global_clipping_bound = experiment_setup['clipping_bound'] if experiment_setup[
+                                                                      "clipping_config"] == "clipped_server" else np.inf
+    global_dp_noise_scale = experiment_setup['dp_noise_scale'] if experiment_setup[
+                                                                      "noise_config"] == "noisy" else 0
+
+    workers = [
+        Worker.remote(experiment_setup['num_workers'], in_dim, all_workers_data[i],
+                      experiment_setup['prior_std'] ** 2, worker_model_config, experiment_setup['clipping_bound'],
+                      experiment_setup['global_damping'], experiment_setup['dataset']['model_noise_std'] ** 2)
+        for i in range(experiment_setup['num_workers'])]
+    i = 0
+    current_params = ray.get(ps.pull.remote(all_keys))
 
     tracker_vals = []
 
     while i < experiment_setup['num_intervals']:
         deltas = [
             worker.get_delta.remote(
-                current_params, damping=damping)
+                current_params, damping=experiment_setup['local_damping'])
             for worker in workers]
-        true_sum_delta = compute_true_update(all_keys, ray.get(deltas))
-        sum_delta = compute_update(all_keys, ray.get(deltas), clipping_bound, dp_noise_scale)
+
+        sum_delta = compute_update(all_keys, ray.get(deltas), global_clipping_bound, experiment_setup['clipping_bound'],
+                                   experiment_setup['global_damping'], global_dp_noise_scale)
         should_stop_priv = accountant.update_privacy_budget()
         current_eps = accountant.current_tracked_val
         ps.push.remote(all_keys, sum_delta)
         current_params = ray.get(ps.pull.remote(all_keys))
         KL_loss = KL_Gaussians(current_params[0], current_params[1], experiment_setup['exact_mean_pres'],
                                experiment_setup['exact_pres'])
-        tracker_i = [sum_delta[0], sum_delta[1], current_params[0], current_params[1], KL_loss, current_eps,
-                     true_sum_delta[0], true_sum_delta[1]]
+        tracker_i = [sum_delta[0], sum_delta[1], current_params[0], current_params[1], KL_loss, current_eps]
         tracker_vals.append(tracker_i)
         print("Interval {} done: {}".format(i, current_params))
         i += 1

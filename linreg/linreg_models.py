@@ -26,6 +26,7 @@ class LinReg_MFVI_analytic():
 
     def __init__(self, din, n_train, noise_var=1,
                  prior_mean=0.0, prior_var=1.0, no_workers=1,
+                 clipping_bound=10, model_config="not_clipped", global_damping=0,
                  single_thread=True):
         self.din = din
         # input and output placeholders
@@ -37,6 +38,10 @@ class LinReg_MFVI_analytic():
         self.noise_var = noise_var
         self.prior_var_num = prior_var
 
+        # these settings affect the deltas which are sent back to the central parameter server
+        self.clipping_bound = clipping_bound
+        self.model_config = model_config
+
         # create parameters for the model
         #  [no_params, w_mean, w_var, w_n1, w_n2,
         #        prior_mean, prior_var, local_n1, local_n2]
@@ -46,6 +51,7 @@ class LinReg_MFVI_analytic():
         self.w_n1, self.w_n2 = res[3], res[4]
         self.prior_mean, self.prior_var = res[5], res[6]
         self.local_n1, self.local_n2 = res[7], res[8]
+        self.global_damping = global_damping
 
         # create helper assignment ops
         self._create_assignment_ops()
@@ -231,6 +237,8 @@ class LinReg_MFVI_analytic():
             self.w_n1, self.w_n2, self.prior_mean, self.prior_var])
         prior_n2 = 1.0 / prior_var
         prior_n1 = prior_mean / prior_var
+        # print("Worker Prior:{}, {}".format(prior_n1, prior_n2))
+        # print("Worker Post:{}, {}".format(post_n1, post_n2))
         new_local_n1 = post_n1 - prior_n1
         new_local_n2 = post_n2 - prior_n2
         old_local_n1 = self.local_n1
@@ -240,9 +248,24 @@ class LinReg_MFVI_analytic():
         new_local_n2[np.where(new_local_n2 < 0)] = 0
         delta_n1 = new_local_n1 - old_local_n1
         delta_n2 = new_local_n2 - old_local_n2
-        self.local_n1 = new_local_n1
-        self.local_n2 = new_local_n2
         param_deltas = [delta_n1, delta_n2]
+        # first, compute parameter deltas as usual.
+
+        if self.model_config == "clipped":
+            norm = (param_deltas[0] ** 2 + param_deltas[1] ** 2) ** 0.5
+            if self.clipping_bound < norm:
+                scaling = self.clipping_bound / norm
+            else:
+                scaling = 1
+            param_deltas = [scaling * param_deltas[0], scaling * param_deltas[1]]
+
+        self.local_n1 = old_local_n1 + (1-self.global_damping) * param_deltas[0]
+        self.local_n2 = old_local_n2 + (1-self.global_damping) * param_deltas[1]
+
+
+        # we need to take the effects of teh global damping into account for the local factors.
+
+
         return param_deltas
 
     def _build_prediction(self):
