@@ -185,14 +185,14 @@ if __name__ == "__main__":
                                      full_setup["dp_noise_scale"],
                                      full_setup["clipping_bound"], full_setup["local_damping"],
                                      full_setup["global_damping"],
-                                     exact_params[dataset_indx][0], exact_params[dataset_indx][0]]
+                                     exact_params[dataset_indx][0], exact_params[dataset_indx][1]]
                 results_array_csv = [eps, eps_var, kl, kl_var, experiment_counter, full_setup["dataset"]["mean"],
                                      clippingConfigToInt(full_setup["clipping_config"]),
                                      noiseConfigToInt(full_setup["noise_config"]),
                                      full_setup["dp_noise_scale"],
                                      full_setup["clipping_bound"], full_setup["local_damping"],
                                      full_setup["global_damping"],
-                                     exact_params[dataset_indx][0], exact_params[dataset_indx][0]]
+                                     exact_params[dataset_indx][0], exact_params[dataset_indx][1]]
                 text_file.write(
                     """eps: {} eps_var: {:.4e} kl: {} kl_var: {:.4e} experiment_counter:{}
                      mean: {}, clipping_config: {}, noise_config: {}, dp_noise_scale: {}, 

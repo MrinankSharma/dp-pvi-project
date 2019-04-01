@@ -171,10 +171,10 @@ if __name__ == "__main__":
                 text_file = open(log_file_path, "a")
                 results_array_txt = [eps, eps_var, kl, kl_var, experiment_counter, model_config,
                                      combinations[dataset_indx],
-                                     exact_params[dataset_indx][0], exact_params[dataset_indx][0]]
+                                     exact_params[dataset_indx][0], exact_params[dataset_indx][1]]
                 results_array_csv = [eps, eps_var, kl, kl_var, experiment_counter, model_config_to_int(model_config),
                                      combinations[dataset_indx],
-                                     exact_params[dataset_indx][0], exact_params[dataset_indx][0]]
+                                     exact_params[dataset_indx][0], exact_params[dataset_indx][1]]
                 text_file.write(
                     """eps: {} eps_var: {:.4e} kl: {} kl_var: {:.4e} experiment_counter:{}
                      model_config: {}, mean: {}, exact_mean_pres: {:.4e}, exact_pres: {:.4e}\n""".format(
