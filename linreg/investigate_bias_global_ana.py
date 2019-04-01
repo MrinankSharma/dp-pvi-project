@@ -21,7 +21,7 @@ parser.add_argument("--output-base-dir", default='', type=str,
 parser.add_argument("--tag", default='default', type=str)
 parser.add_argument("--overwrite", dest='overwrite', action='store_true')
 parser.add_argument("--testing", dest='testing', action='store_true')
-parser.add_argument("--no-workers", default=40, type=int,
+parser.add_argument("--no-workers", default=20, type=int,
                     help="num_workers.")
 parser.add_argument("--N-dp-seeds", default=5, type=int,
                     help="output base folder.")
