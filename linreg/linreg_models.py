@@ -624,7 +624,7 @@ class LinReg_MFVI_DPSGD():
     def __init__(self, din, n_train, accountant, noise_var=1,
                  prior_mean=0.0, prior_var=1,
                  no_workers=1, gradient_bound=5,
-                 learning_rate_mean=1e-6, learning_rate_var=1e-3, dpsgd_noise_scale=5, lot_size=1000,
+                 learning_rate=1e-6, dpsgd_noise_scale=5, lot_size=1000,
                  num_iterations=10000, single_thread=True):
         self.din = din
         # input and output placeholders
@@ -639,12 +639,11 @@ class LinReg_MFVI_DPSGD():
 
         # DP-SGD Parameters
         self.gradient_bound = gradient_bound
-        self.learning_rate_mean = tf.constant(learning_rate_mean, dtype=float_type)
-        self.learning_rate_var = tf.constant(learning_rate_var, dtype=float_type)
+        self.learning_rate_mean = tf.constant(learning_rate, dtype=float_type)
+        self.learning_rate_var = tf.constant(learning_rate * 1e3, dtype=float_type)
         self.dpsgd_noise_scale = dpsgd_noise_scale
         self.num_iterations = num_iterations
         self.lot_size = lot_size
-        self.gradient_bound = gradient_bound
 
         res = self._create_params(prior_mean, prior_var)
         self.no_weights = res[0]
@@ -1214,6 +1213,16 @@ class LinReg_MFVI_DP_analytic():
             noise = self.noise_dist.sample()
             xTx_noisy = tf.reshape(xTx_cs + tf.cast(noise[0], dtype=float_type), [1])
             xTy_noisy = tf.reshape((xTy_cs + tf.cast(noise[1], dtype=float_type)), [1])
+        elif self.model_config == "updated_clipped_not_noisy":
+            xTx_i = xTx_i / self.noise_var + (1 / self.prior_var - 1 / self.w_var) * np.float(1.0/10);
+            xTy_i = xTy_i / self.noise_var + (
+                                             self.prior_mean / self.prior_var - self.w_mean / self.w_var) * np.float(1.0/10);
+            pres_update, mean_update = tf.py_func(self.clip_sum_values, [xTx_i, xTy_i], (float_type, float_type))
+            pres = pres_update + 1 / self.w_var;
+            mean_pres = mean_update + self.w_mean / self.w_var;
+            update_m = self.w_mean.assign(mean_pres / pres);
+            update_v = self.w_var.assign(1 / pres)
+            return update_m, update_v, tf.print(pres), tf.print(mean_pres)
 
         Voinv = tf.diag(1.0 / self.prior_var)
         Voinvmo = self.prior_mean / self.prior_var

@@ -98,8 +98,11 @@ if __name__ == "__main__":
     }
 
     if testing:
+        experiment_setup["mean_vals"] = [2]
+        experiment_setup["model_config"] = ["updated_clipped"]
         experiment_setup["N_dp_seeds"] = 1
         experiment_setup["dataset"]["mean_vals"] = [2]
+        experiment_setup["clipping_bound"] = 5
         tag = 'testing'
         should_overwrite = True
 

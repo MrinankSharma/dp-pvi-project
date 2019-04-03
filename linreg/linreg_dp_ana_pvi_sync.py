@@ -17,27 +17,6 @@ import tensorflow as tf
 from linreg.moments_accountant import MomentsAccountantPolicy, MomentsAccountant
 from linreg.inference_utils import KL_Gaussians
 
-parser = argparse.ArgumentParser(description="synchronous distributed variational training.")
-parser.add_argument("--data", default='toy_1d', type=str,
-                    help="Data set: toy_1d.")
-parser.add_argument("--seed", default=42, type=int,
-                    help="Random seed.")
-parser.add_argument("--no-intervals", default=20, type=int,
-                    help="Number of measurements/parameter savings.")
-parser.add_argument("--num-workers", default=4, type=int,
-                    help="The number of workers to use.")
-parser.add_argument("--data-type", default='homous', type=str,
-                    help="Data distribution: homous (homogeneous) vs inhomous (inhomogeneous).")
-parser.add_argument("--damping", default=0.0, type=float,
-                    help="damping rate, new = damping * old + (1-damping) * new.")
-parser.add_argument("--redis-address", default=None, type=str,
-                    help="The Redis address of the cluster.")
-parser.add_argument("--mean", default=2, type=float,
-                    help="Linear Regression Slope")
-parser.add_argument("--noise-std", default=1, type=float,
-                    help="Noise Standard Deviation")
-
-
 @ray.remote
 class ParameterServer(object):
     def __init__(self, keys, values, conv_thres=0.01 * 1e-2):
