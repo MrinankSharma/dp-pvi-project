@@ -43,16 +43,23 @@ parser.add_argument("--clipping-bound", default=10000, type=float,
 
 @ray.remote
 class ParameterServer(object):
-    def __init__(self, keys, values, conv_thres=0.01 * 1e-2):
+    def __init__(self, keys, values, conv_thres=2, conv_length=20, max_iterations=250):
         # These values will be mutated, so we must create a copy that is not
         # backed by the object store.
         values = [value.copy() for value in values]
         self.params = dict(zip(keys, values))
         self.should_stop = False
         self.conv_thres = conv_thres
-        self.param_it_count = 0.0
+        self.conv_length = conv_length
+        self.delta_it_count = 0
+        self.delta_history = np.zeros([max_iterations, 2])
+        self.conv_val = 0
 
     def push(self, keys, values):
+        self.delta_history[self.delta_it_count][0] = values[0]
+        self.delta_history[self.delta_it_count][1] = values[1]
+        self.delta_it_count += 1
+
         updates = {}
         orig_vals = {}
         pres_key = 'variational_nat/precision'
@@ -69,24 +76,22 @@ class ParameterServer(object):
         # reject value if it results in a negative variance.
         if self.params[pres_key] < 0:
             for key, value in self.params.iteritems():
-                # print("before update {}: {} orig: {}".format(key, self.params[key], orig_vals[key]))
                 self.params[key] = orig_vals[key]
-                # print("{}: {} orig: {}".format(key, self.params[key], orig_vals[key]))
 
             print('Rejected negative precision')
 
         if not self.should_stop:
-            self.should_stop = True
-            for k in keys:
-                val = np.abs(updates[k] / orig_vals[k])
-                if val > self.conv_thres:
-                    self.should_stop = False
+            [self.should_stop, self.conv_val] = check_convergence(self.delta_history, self.conv_length, self.conv_thres,
+                                                                  self.delta_it_count)
 
     def pull(self, keys):
         return [self.params[key] for key in keys]
 
     def get_should_stop(self):
         return self.should_stop
+
+    def get_conv_val(self):
+        return self.conv_val
 
 
 @ray.remote
@@ -140,7 +145,8 @@ def add_noise_clip_delta(deltas, clipping_bound, default_clipping_bound, noise_s
     return new_deltas
 
 
-def compute_update(keys, deltas, global_clipping_bound, default_clipping_bound, global_damping, noise_scale, method='sum'):
+def compute_update(keys, deltas, global_clipping_bound, default_clipping_bound, global_damping, noise_scale,
+                   method='sum'):
     mean_delta = []
     updated_deltas = add_noise_clip_delta(deltas, global_clipping_bound, default_clipping_bound, noise_scale)
     for i, key in enumerate(keys):
@@ -155,6 +161,22 @@ def compute_update(keys, deltas, global_clipping_bound, default_clipping_bound, 
         elif method == 'mean':
             mean_delta.append(sum_delta / no_deltas)
     return mean_delta
+
+
+def check_convergence(param_history, length, threshold, num_deltas):
+    end_index = num_deltas
+    start_index = num_deltas - length
+
+    if start_index < 5:
+        return False, 0
+
+    recent_hist = param_history[start_index:end_index]
+    val = np.sum(np.abs(np.sum(recent_hist, 0)))
+    # print("Convergence Test Value: {}".format(val))
+    if val < threshold:
+        return True, val
+    else:
+        return False, val
 
 
 @ray.remote
@@ -186,19 +208,27 @@ def run_global_dp_analytical_pvi_sync(experiment_setup, seed, all_workers_data, 
         accountant.log_moments_increment = log_moments
 
     all_keys, all_values = net.get_params()
-    ps = ParameterServer.remote(all_keys, all_values)
+    ps = ParameterServer.remote(all_keys, all_values, experiment_setup["convergence_threshold"],
+                                experiment_setup["conv_length"],
+                                experiment_setup["num_intervals"])
 
-    worker_model_config = "not_clipped" if (experiment_setup["clipping_config"] == "not_clipped" or experiment_setup[
+    worker_clipping_config = "not_clipped" if (experiment_setup["clipping_config"] == "not_clipped" or experiment_setup[
         "clipping_config"] == "clipped_server") else "clipped"
+
+    worker_noise_config = "noisy_worker" if experiment_setup["noise_config"] == "noise_worker" else "not_noisy"
 
     global_clipping_bound = experiment_setup['clipping_bound'] if experiment_setup[
                                                                       "clipping_config"] == "clipped_server" else np.inf
     global_dp_noise_scale = experiment_setup['dp_noise_scale'] if experiment_setup[
                                                                       "noise_config"] == "noisy" else 0
+    worker_config = {
+        "clipping": worker_clipping_config,
+        "noise": worker_noise_config
+    }
 
     workers = [
         Worker.remote(experiment_setup['num_workers'], in_dim, all_workers_data[i],
-                      experiment_setup['prior_std'] ** 2, worker_model_config, experiment_setup['clipping_bound'],
+                      experiment_setup['prior_std'] ** 2, worker_config, experiment_setup['clipping_bound'],
                       experiment_setup['global_damping'], experiment_setup['dataset']['model_noise_std'] ** 2)
         for i in range(experiment_setup['num_workers'])]
     i = 0
@@ -218,11 +248,12 @@ def run_global_dp_analytical_pvi_sync(experiment_setup, seed, all_workers_data, 
         current_eps = accountant.current_tracked_val
         ps.push.remote(all_keys, sum_delta)
         current_params = ray.get(ps.pull.remote(all_keys))
+        conv_val = ray.get(ps.get_conv_val.remote())
         KL_loss = KL_Gaussians(current_params[0], current_params[1], experiment_setup['exact_mean_pres'],
                                experiment_setup['exact_pres'])
-        tracker_i = [sum_delta[0], sum_delta[1], current_params[0], current_params[1], KL_loss, current_eps]
+        tracker_i = [sum_delta[0], sum_delta[1], current_params[0], current_params[1], KL_loss, current_eps, conv_val]
         tracker_vals.append(tracker_i)
-        print("Interval {} done: {}".format(i, current_params))
+        print("Interval {} done: {}\nConv Val: {}\n".format(i, current_params, conv_val))
         i += 1
 
         if ray.get(ps.get_should_stop.remote()):

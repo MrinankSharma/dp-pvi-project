@@ -26,8 +26,8 @@ class LinReg_MFVI_analytic():
 
     def __init__(self, din, n_train, noise_var=1,
                  prior_mean=0.0, prior_var=1.0, no_workers=1,
-                 clipping_bound=10, model_config="not_clipped", global_damping=0,
-                 single_thread=True):
+                 clipping_bound=10, model_config=None, global_damping=0,
+                 dp_noise_level=10, single_thread=True):
         self.din = din
         # input and output placeholders
         self.xtrain = tf.placeholder(float_type, [None, din], 'input')
@@ -38,9 +38,19 @@ class LinReg_MFVI_analytic():
         self.noise_var = noise_var
         self.prior_var_num = prior_var
 
+        if model_config is None:
+            self.model_config = {
+                "clipping": "worker",
+                "noisy": "noisy_worker"
+            }
+
         # these settings affect the deltas which are sent back to the central parameter server
         self.clipping_bound = clipping_bound
         self.model_config = model_config
+
+        dp_std = clipping_bound * dp_noise_level / no_workers ** 0.5;
+        self.noise_dist = tfp.distributions.MultivariateNormalDiag(loc=np.zeros(2 * din),
+                                                                   scale_diag=dp_std * np.ones(2 * din))
 
         # create parameters for the model
         #  [no_params, w_mean, w_var, w_n1, w_n2,
@@ -251,7 +261,7 @@ class LinReg_MFVI_analytic():
         param_deltas = [delta_n1, delta_n2]
         # first, compute parameter deltas as usual.
 
-        if self.model_config == "clipped":
+        if self.model_config["clipping"] == "clipped":
             norm = (param_deltas[0] ** 2 + param_deltas[1] ** 2) ** 0.5
             if self.clipping_bound < norm:
                 scaling = self.clipping_bound / norm
@@ -259,12 +269,14 @@ class LinReg_MFVI_analytic():
                 scaling = 1
             param_deltas = [scaling * param_deltas[0], scaling * param_deltas[1]]
 
-        self.local_n1 = old_local_n1 + (1-self.global_damping) * param_deltas[0]
-        self.local_n2 = old_local_n2 + (1-self.global_damping) * param_deltas[1]
+        if self.model_config["noise"] == "noise_worker":
+            noise = self.noise_dist.sample()
+            param_deltas = [param_deltas[0] + noise[0], param_deltas[1] + noise[1]]
 
+        self.local_n1 = old_local_n1 + (1 - self.global_damping) * param_deltas[0]
+        self.local_n2 = old_local_n2 + (1 - self.global_damping) * param_deltas[1]
 
         # we need to take the effects of teh global damping into account for the local factors.
-
 
         return param_deltas
 
@@ -703,7 +715,7 @@ class LinReg_MFVI_DPSGD():
                 self.accountant.update_privacy_budget()
 
         if not self.accountant.should_stop:
-            print("Privacy Cost: " + str(self.accountant.current_tracked_val))
+            # print("Privacy Cost: " + str(self.accountant.current_tracked_val))
             return np.array([c, c_kl, c_lik])
 
     def get_weights(self):
@@ -980,7 +992,7 @@ class LinReg_MFVI_DPSGD():
         prefactor = tf.cast(1 / N, dtype=float_type)
 
         # these are now individual terms
-        lik_mean_term_i = (-0.5 / (self.noise_var)) * (2 * self.w_mean * xTx_i - 2 * xTy_i)
+        lik_mean_term_i = (-0.5 / self.noise_var) * (2 * self.w_mean * xTx_i - 2 * xTy_i)
         lik_var_term_i = (-0.5 / self.noise_var) * xTx_i
 
         # these terms needs to be rescaling by 1/N (summed later on)
@@ -1214,9 +1226,10 @@ class LinReg_MFVI_DP_analytic():
             xTx_noisy = tf.reshape(xTx_cs + tf.cast(noise[0], dtype=float_type), [1])
             xTy_noisy = tf.reshape((xTy_cs + tf.cast(noise[1], dtype=float_type)), [1])
         elif self.model_config == "updated_clipped_not_noisy":
-            xTx_i = xTx_i / self.noise_var + (1 / self.prior_var - 1 / self.w_var) * np.float(1.0/10);
+            xTx_i = xTx_i / self.noise_var + (1 / self.prior_var - 1 / self.w_var) * np.float(1.0 / 10);
             xTy_i = xTy_i / self.noise_var + (
-                                             self.prior_mean / self.prior_var - self.w_mean / self.w_var) * np.float(1.0/10);
+                                                 self.prior_mean / self.prior_var - self.w_mean / self.w_var) * np.float(
+                1.0 / 10);
             pres_update, mean_update = tf.py_func(self.clip_sum_values, [xTx_i, xTy_i], (float_type, float_type))
             pres = pres_update + 1 / self.w_var;
             mean_pres = mean_update + self.w_mean / self.w_var;

@@ -89,12 +89,12 @@ if __name__ == "__main__":
         "dataset": {
             "dataset": 'toy_1d',
             "data_type": 'homous',
-            "mean": [-2, -1, 0, 1, 2, 4],
+            "mean": [-2, -1, 1, 2, 4],
             "model_noise_std": 0.5,
             "points_per_worker": 10,
         },
         "clipping_config": ["not_clipped", "clipped_worker", "clipped_server"],
-        "noise_config": ["not_noisy", "noisy"],
+        "noise_config": ["not_noisy", "noisy", "noisy_worker"],
         "N_dp_seeds": args.N_dp_seeds,
         "prior_std": 5,
         "tag": tag,
@@ -106,12 +106,15 @@ if __name__ == "__main__":
         "local_damping": 0,
         "global_damping": 0.9,
         "max_eps": 1e50,
+        "convergence_threshold": 2
     }
 
     if testing:
         experiment_setup["N_dp_seeds"] = 1
         experiment_setup["dataset"]["mean"] = [2]
         experiment_setup["clipping_bound"] = 50
+        experiment_setup["clipping_config"] = "clipped_worker"
+        experiment_setup["noise_config"] = "noisy_worker"
         tag = 'testing'
         should_overwrite = True
 

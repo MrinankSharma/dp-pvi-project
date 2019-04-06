@@ -13,6 +13,7 @@ import linreg.data as data
 import tensorflow as tf
 from linreg.moments_accountant import MomentsAccountantPolicy, MomentsAccountant
 from linreg.inference_utils import exact_inference, KL_Gaussians
+from linreg.log_moment_utils import generate_log_moments
 
 
 @ray.remote
@@ -61,7 +62,7 @@ class Worker(object):
         # Initialize the model
         n_train_worker = self.x_train.shape[0]
         self.n_train = n_train_worker
-        self.accountant = MomentsAccountant(MomentsAccountantPolicy.FIXED_DELTA_MAX_EPS, 1e-5, max_eps, 32)
+        self.accountant = MomentsAccountant(MomentsAccountantPolicy.FIXED_DELTA_MAX_EPS, 1e-2, max_eps, 32)
 
         self.net = linreg_models.LinReg_MFVI_DPSGD(
             din, n_train_worker, self.accountant, noise_var=noise_var, no_workers=no_workers, gradient_bound=c,
@@ -126,12 +127,12 @@ def run_dpsgd_pvi_sync(experiment_setup, seed, max_eps, all_workers_data, exact_
 
     # create workers
     workers = [
-        Worker.remote(experiment_setup['num_workers'], in_dim, all_workers_data[i], max_eps,
+        Worker.remote(in_dim, experiment_setup['num_workers'], all_workers_data[i], max_eps,
                       experiment_setup['dp_noise_scale'],
                       experiment_setup['clipping_bound'], experiment_setup['dataset']['model_noise_std'] ** 2,
                       experiment_setup['prior_std'] ** 2,
                       experiment_setup['learning_rate'], experiment_setup['local_num_iterations'],
-                      experiment_setup['lot_size'], np.zeros(32))
+                      experiment_setup['lot_size'], log_moments)
         for i in range(experiment_setup['num_workers'])]
     i = 0
     current_params = ray.get(ps.pull.remote(all_keys))
@@ -159,7 +160,7 @@ def run_dpsgd_pvi_sync(experiment_setup, seed, max_eps, all_workers_data, exact_
         current_eps = ray.get(workers[0].get_privacy_spent.remote())
         ps.push.remote(all_keys, sum_delta)
         current_params = ray.get(ps.pull.remote(all_keys))
-        print("Interval {} done: {}".format(i, current_params))
+        print("Interval {} done: {} eps:{} ".format(i, current_params, current_eps))
         i += 1
 
         if exact_params == None:
@@ -204,16 +205,16 @@ if __name__ == "__main__":
         },
         "prior_std": 5,
         "num_workers": 5,
-        "num_intervals": 100,
+        "num_intervals": 1000,
         "output_base_dir": '',
         "dp_noise_scale": 1,
-        "clipping_bound": 20,
+        "clipping_bound": 40,
         "local_damping": 0,
         "global_damping": 0,
         "max_eps": 1e50,
-        "learning_rate": 1e-5,
+        "learning_rate": 1e-6,
         "local_num_iterations": 50,
-        "lot_size": 10,
+        "lot_size": 5,
     }
 
     dataset_setup = experiment_setup["dataset"]
@@ -234,7 +235,9 @@ if __name__ == "__main__":
     _, _, exact_mean_pres, exact_pres = exact_inference(x_train, y_train, experiment_setup['prior_std'],
                                                         dataset_setup['model_noise_std'] ** 2)
 
+    log_moments = generate_log_moments(experiment_setup["dataset"]["points_per_worker"], 32, experiment_setup["dp_noise_scale"],
+                         experiment_setup["lot_size"])
     print("Exact Params: {}, {}".format(exact_mean_pres, exact_pres))
     ray.init()
-    results = run_dpsgd_pvi_sync.remote(experiment_setup, 1, 1e50, workers_data, [exact_mean_pres, exact_pres])
+    results = run_dpsgd_pvi_sync.remote(experiment_setup, 1, 1e50, workers_data, [exact_mean_pres, exact_pres], log_moments)
     ray.get(results)
