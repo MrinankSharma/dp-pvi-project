@@ -135,6 +135,7 @@ def add_noise_clip_delta(deltas, clipping_bound, default_clipping_bound, noise_s
 
     true_noise_scale = noise_scale * clipping_bound
     true_noise_scale = 0 if np.isnan(true_noise_scale) else true_noise_scale
+
     if clipping_bound == np.inf and noise_scale != 0:
         true_noise_scale = default_clipping_bound * noise_scale
 
@@ -209,13 +210,13 @@ def run_global_dp_analytical_pvi_sync(experiment_setup, seed, all_workers_data, 
 
     all_keys, all_values = net.get_params()
     ps = ParameterServer.remote(all_keys, all_values, experiment_setup["convergence_threshold"],
-                                experiment_setup["conv_length"],
+                                experiment_setup["convergence_length"],
                                 experiment_setup["num_intervals"])
 
     worker_clipping_config = "not_clipped" if (experiment_setup["clipping_config"] == "not_clipped" or experiment_setup[
         "clipping_config"] == "clipped_server") else "clipped"
 
-    worker_noise_config = "noisy_worker" if experiment_setup["noise_config"] == "noise_worker" else "not_noisy"
+    worker_noise_config = "noisy_worker" if experiment_setup["noise_config"] == "noisy_worker" else "not_noisy"
 
     global_clipping_bound = experiment_setup['clipping_bound'] if experiment_setup[
                                                                       "clipping_config"] == "clipped_server" else np.inf

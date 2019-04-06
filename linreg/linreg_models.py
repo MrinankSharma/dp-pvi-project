@@ -48,9 +48,7 @@ class LinReg_MFVI_analytic():
         self.clipping_bound = clipping_bound
         self.model_config = model_config
 
-        dp_std = clipping_bound * dp_noise_level / no_workers ** 0.5;
-        self.noise_dist = tfp.distributions.MultivariateNormalDiag(loc=np.zeros(2 * din),
-                                                                   scale_diag=dp_std * np.ones(2 * din))
+        self.noise_scale = clipping_bound * dp_noise_level / no_workers ** 0.5;
 
         # create parameters for the model
         #  [no_params, w_mean, w_var, w_n1, w_n2,
@@ -269,8 +267,9 @@ class LinReg_MFVI_analytic():
                 scaling = 1
             param_deltas = [scaling * param_deltas[0], scaling * param_deltas[1]]
 
-        if self.model_config["noise"] == "noise_worker":
-            noise = self.noise_dist.sample()
+        if self.model_config["noise"] == "noisy_worker":
+            # print("adding noise at the worker")
+            noise = np.random.normal(0, self.noise_scale, [2])
             param_deltas = [param_deltas[0] + noise[0], param_deltas[1] + noise[1]]
 
         self.local_n1 = old_local_n1 + (1 - self.global_damping) * param_deltas[0]

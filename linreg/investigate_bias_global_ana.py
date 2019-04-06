@@ -104,9 +104,10 @@ if __name__ == "__main__":
         "dp_noise_scale": 1,
         "clipping_bound": [10, 20, 50, 100],
         "local_damping": 0,
-        "global_damping": 0.9,
+        "global_damping": 0.5,
         "max_eps": 1e50,
-        "convergence_threshold": 2
+        "convergence_threshold": 2,
+        "convergence_length": 20
     }
 
     if testing:
