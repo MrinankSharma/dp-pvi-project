@@ -184,7 +184,7 @@ def check_convergence(param_history, length, threshold, num_deltas):
 def run_global_dp_analytical_pvi_sync(experiment_setup, seed, all_workers_data, log_moments=None):
     # logging
     path = experiment_setup['output_base_dir'] + 'logs/global_dp_ana_sync_pvi/' + time.strftime(
-        "%m-%d;%H:%M:%S") + "-s-" + str(experiment_setup["seed"]) + '/'
+        "%m-%d;%H:%M:%S") + "-s-" + str(seed) + '/'
     if not os.path.exists(path):
         os.makedirs(path)
 
