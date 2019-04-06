@@ -74,6 +74,8 @@ def noiseConfigToInt(cfg):
         return 0
     elif cfg == "noisy":
         return 1
+    elif cfg == "noisy_worker":
+        return 1
 
 
 if __name__ == "__main__":
@@ -93,8 +95,8 @@ if __name__ == "__main__":
             "model_noise_std": 0.5,
             "points_per_worker": 10,
         },
-        "clipping_config": ["not_clipped", "clipped_worker", "clipped_server"],
-        "noise_config": ["not_noisy", "noisy", "noisy_worker"],
+        "clipping_config": ["clipped_worker"],
+        "noise_config": ["noisy_worker"],
         "N_dp_seeds": args.N_dp_seeds,
         "prior_std": 5,
         "tag": tag,
