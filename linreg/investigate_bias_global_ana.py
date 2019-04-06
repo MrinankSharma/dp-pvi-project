@@ -101,19 +101,19 @@ if __name__ == "__main__":
         "num_workers": no_workers,
         "num_intervals": 250,
         "output_base_dir": output_base_dir,
-        "dp_noise_scale": 1,
+        "dp_noise_scale": [1, 3, 5, 7],
         "clipping_bound": [10, 20, 50, 100],
         "local_damping": 0,
-        "global_damping": 0.5,
+        "global_damping": [0.7, 0.8, 0.9],
         "max_eps": 1e50,
-        "convergence_threshold": 2,
-        "convergence_length": 20
+        "convergence_threshold": "automatic",
+        "convergence_length": 50
     }
 
     if testing:
         experiment_setup["N_dp_seeds"] = 1
         experiment_setup["dataset"]["mean"] = [2]
-        experiment_setup["clipping_bound"] = 50
+        experiment_setup["clipping_bound"] = 10
         experiment_setup["clipping_config"] = "clipped_worker"
         experiment_setup["noise_config"] = "noisy_worker"
         tag = 'testing'

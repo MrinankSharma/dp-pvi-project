@@ -172,7 +172,7 @@ def check_convergence(param_history, length, threshold, num_deltas):
         return False, 0
 
     recent_hist = param_history[start_index:end_index]
-    val = np.sum(np.abs(np.sum(recent_hist, 0)))
+    val = np.mean(np.abs(np.mean(recent_hist, 0)))
     # print("Convergence Test Value: {}".format(val))
     if val < threshold:
         return True, val
@@ -209,7 +209,15 @@ def run_global_dp_analytical_pvi_sync(experiment_setup, seed, all_workers_data, 
         accountant.log_moments_increment = log_moments
 
     all_keys, all_values = net.get_params()
-    ps = ParameterServer.remote(all_keys, all_values, experiment_setup["convergence_threshold"],
+
+    if experiment_setup["convergence_threshold"] == "automatic":
+        convergence_threshold = experiment_setup["clipping_bound"] * experiment_setup["dp_noise_scale"] / (
+            experiment_setup["num_workers"] ** 0.5)
+        print("convergence threshold calculated automatically: {}".format(convergence_threshold))
+    else:
+        convergence_threshold = experiment_setup["convergence_threshold"]
+
+    ps = ParameterServer.remote(all_keys, all_values, convergence_threshold,
                                 experiment_setup["convergence_length"],
                                 experiment_setup["num_intervals"])
 
