@@ -2,13 +2,14 @@ import numpy as np
 import tensorflow as tf
 import traceback
 import pprint
-
 import argparse
 import copy
+import hashlib
 
 import linreg.data as data
 from linreg.linreg_global_dp_ana_pvi_sync import run_global_dp_analytical_pvi_sync
 from linreg.inference_utils import exact_inference, generateDictCombinations
+from linreg.file_utils import get_experiment_tags_from_csv
 import os
 import ray
 import json
@@ -145,9 +146,17 @@ if __name__ == "__main__":
     experiment_setup.pop("dataset")
     experiment_list = generateDictCombinations(experiment_setup)
 
+    alreadyRunExperiments = get_experiment_tags_from_csv(csv_file_path)
+
     experiment_counter = 0
     for dataset_indx, dataset in enumerate(datasets):
         for experiment_setup in experiment_list:
+            experiment_code = hashlib.sha1(json.dumps(experiment_setup, sort_keys=True)).hexdigest()
+            if experiment_code in alreadyRunExperiments:
+                print("Skipping Experiment")
+                pprint.pprint(full_setup, width=1)
+                print("Experiment Skipped \n\n")
+
             try:
                 full_setup = copy.deepcopy(experiment_setup)
                 full_setup["dataset"] = specific_setups[dataset_indx]
@@ -198,7 +207,7 @@ if __name__ == "__main__":
                                      full_setup["dp_noise_scale"],
                                      full_setup["clipping_bound"], full_setup["local_damping"],
                                      full_setup["global_damping"],
-                                     exact_params[dataset_indx][0], exact_params[dataset_indx][1]]
+                                     exact_params[dataset_indx][0], exact_params[dataset_indx][1], experiment_code]
                 text_file.write(
                     """eps: {} eps_var: {:.4e} kl: {} kl_var: {:.4e} experiment_counter:{}
                      mean: {}, clipping_config: {}, noise_config: {}, dp_noise_scale: {}, 
@@ -208,7 +217,7 @@ if __name__ == "__main__":
                 text_file.close()
                 csv_file = open(csv_file_path, "a")
                 csv_file.write(
-                    "{},{},{},{},{},{},{},{},{},{},{},{},{},{}\n".format(*results_array_csv))
+                    "{},{},{},{},{},{},{},{},{},{},{},{},{},{},{}\n".format(*results_array_csv))
                 csv_file.close()
                 experiment_counter += 1
             except Exception, e:

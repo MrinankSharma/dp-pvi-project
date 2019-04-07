@@ -18,3 +18,13 @@ def get_params_from_csv(csv_file_path):
                                         float(row[clipping_bound_ind]), float(row[L_ind])))
 
     return params_searched
+
+def get_experiment_tags_from_csv(csv_file_path):
+    codes = []
+    code_index = 14
+    with open(csv_file_path, 'rb') as csvfile:
+        reader = csv.reader(csvfile, delimiter=',')
+        for row in reader:
+            codes.append(row[code_index])
+
+    return codes
