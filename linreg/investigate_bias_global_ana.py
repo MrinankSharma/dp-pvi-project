@@ -120,7 +120,7 @@ if __name__ == "__main__":
         experiment_setup["clipping_config"] = "clipped_worker"
         experiment_setup["noise_config"] = "noisy_worker"
         tag = 'testing'
-        should_overwrite = True
+        # should_overwrite = True
 
     np.random.seed(experiment_setup['seed'])
     tf.set_random_seed(experiment_setup['seed'])
@@ -146,23 +146,33 @@ if __name__ == "__main__":
     experiment_setup.pop("dataset")
     experiment_list = generateDictCombinations(experiment_setup)
 
-    alreadyRunExperiments = get_experiment_tags_from_csv(csv_file_path)
+    alreadyRunExperiments = []
+    if os.path.exists(csv_file_path):
+        # if overwriting, delete the results files
+        if should_overwrite:
+            os.remove(csv_file_path)
+            os.remove(log_file_path)
+        else:
+            # do not duplicate experiments
+            alreadyRunExperiments = get_experiment_tags_from_csv(csv_file_path)
 
     experiment_counter = 0
     for dataset_indx, dataset in enumerate(datasets):
         for experiment_setup in experiment_list:
             experiment_code = hashlib.sha1(json.dumps(experiment_setup, sort_keys=True)).hexdigest()
-            if experiment_code in alreadyRunExperiments:
+            full_setup = copy.deepcopy(experiment_setup)
+            full_setup["dataset"] = specific_setups[dataset_indx]
+            full_setup["exact_mean_pres"] = exact_params[dataset_indx][0]
+            full_setup["exact_pres"] = exact_params[dataset_indx][1]
+
+            print(experiment_code)
+            if experiment_code in alreadyRunExperiments and not should_overwrite:
                 print("Skipping Experiment")
                 pprint.pprint(full_setup, width=1)
                 print("Experiment Skipped \n\n")
+                continue
 
             try:
-                full_setup = copy.deepcopy(experiment_setup)
-                full_setup["dataset"] = specific_setups[dataset_indx]
-                full_setup["exact_mean_pres"] = exact_params[dataset_indx][0]
-                full_setup["exact_pres"] = exact_params[dataset_indx][1]
-
                 pprint.pprint(full_setup, width=1)
 
                 eps_i = np.zeros(experiment_setup['N_dp_seeds'])
