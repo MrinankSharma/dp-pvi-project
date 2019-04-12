@@ -76,7 +76,7 @@ def noiseConfigToInt(cfg):
     elif cfg == "noisy":
         return 1
     elif cfg == "noisy_worker":
-        return 1
+        return 2
 
 
 if __name__ == "__main__":
@@ -92,7 +92,7 @@ if __name__ == "__main__":
         "dataset": {
             "dataset": 'toy_1d',
             "data_type": 'homous',
-            "mean": [-2, -1, 1, 2, 4],
+            "mean": [2],
             "model_noise_std": 0.5,
             "points_per_worker": 10,
         },
@@ -104,12 +104,34 @@ if __name__ == "__main__":
         "num_workers": no_workers,
         "num_intervals": 250,
         "output_base_dir": output_base_dir,
-        "dp_noise_scale": [1, 3, 5, 7],
-        "clipping_bound": [10, 20, 50, 100],
+        "dp_noise_scale": [1, 4, 8],
+        "clipping_bound": [0.1, 1, 10],
         "local_damping": 0,
-        "global_damping": [0.7, 0.8, 0.9],
-        "max_eps": 1e50,
-        "convergence_threshold": "automatic",
+        "learning_rate":[
+            {
+                "scheme": "constant",
+                "start_value": [0.15, 0.5, 0.85],
+            },
+            {
+                "scheme": "step",
+                "start_value": [0.15, 0.5, 0.85],
+                "factor": 0.5,
+                "interval": 20,
+            },
+            {
+                "scheme": "step",
+                "start_value": [0.15, 0.5, 0.85],
+                "factor": 0.8,
+                "interval": 10,
+            },
+            {
+                "scheme": "exponential",
+                "start_value": [0.15, 0.5, 0.85],
+                "alpha": [0.05, 0.03],
+            }
+        ],
+        "max_eps": [5, 10, 50],
+        "convergence_threshold": "disabled",
         "convergence_length": 50
     }
 

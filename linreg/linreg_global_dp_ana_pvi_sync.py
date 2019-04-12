@@ -13,7 +13,7 @@ import ray
 import linreg.linreg_models as linreg_models
 import tensorflow as tf
 from linreg.moments_accountant import MomentsAccountantPolicy, MomentsAccountant
-from linreg.inference_utils import KL_Gaussians
+from linreg.inference_utils import KL_Gaussians, generate_learning_rate_schedule
 from linreg.log_moment_utils import generate_log_moments
 
 parser = argparse.ArgumentParser(description="synchronous distributed variational training.")
@@ -110,7 +110,9 @@ class Worker(object):
                                                       clipping_bound=clipping_bound, global_damping=global_damping)
         self.keys = self.net.get_params()[0]
 
-    def get_delta(self, params, damping=0.5):
+    def get_delta(self, params, learning_rate, damping=0.5):
+        # centrally update the learning rate
+        self.net.global_damping = 1-learning_rate
         # apply params
         self.net.set_params(self.keys, params)
         # train the network
@@ -214,6 +216,9 @@ def run_global_dp_analytical_pvi_sync(experiment_setup, seed, all_workers_data, 
         convergence_threshold = experiment_setup["clipping_bound"] * experiment_setup["dp_noise_scale"] / (
             experiment_setup["num_workers"] ** 0.5)
         print("convergence threshold calculated automatically: {}".format(convergence_threshold))
+    elif experiment_setup["convergence_threshold"] == "disabled":
+        # would never be reached...
+        convergence_threshold = 0
     else:
         convergence_threshold = experiment_setup["convergence_threshold"]
 
@@ -235,6 +240,9 @@ def run_global_dp_analytical_pvi_sync(experiment_setup, seed, all_workers_data, 
         "noise": worker_noise_config
     }
 
+    learning_rate_schedule = generate_learning_rate_schedule(
+        experiment_setup['num_intervals', experiment_setup['learning_rate']])
+
     workers = [
         Worker.remote(experiment_setup['num_workers'], in_dim, all_workers_data[i],
                       experiment_setup['prior_std'] ** 2, worker_config, experiment_setup['clipping_bound'],
@@ -246,13 +254,14 @@ def run_global_dp_analytical_pvi_sync(experiment_setup, seed, all_workers_data, 
     tracker_vals = []
 
     while i < experiment_setup['num_intervals']:
+        current_learning_rate = learning_rate_schedule[i]
         deltas = [
             worker.get_delta.remote(
-                current_params, damping=experiment_setup['local_damping'])
+                current_params, current_learning_rate, damping=experiment_setup['local_damping'])
             for worker in workers]
 
         sum_delta = compute_update(all_keys, ray.get(deltas), global_clipping_bound, experiment_setup['clipping_bound'],
-                                   experiment_setup['global_damping'], global_dp_noise_scale)
+                                   1-current_learning_rate, global_dp_noise_scale)
         should_stop_priv = accountant.update_privacy_budget()
         current_eps = accountant.current_tracked_val
         ps.push.remote(all_keys, sum_delta)

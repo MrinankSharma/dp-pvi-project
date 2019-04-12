@@ -48,7 +48,7 @@ class LinReg_MFVI_analytic():
         self.clipping_bound = clipping_bound
         self.model_config = model_config
 
-        self.noise_scale = clipping_bound * dp_noise_level / no_workers ** 0.5;
+        self.noise_scale = clipping_bound * dp_noise_level / (no_workers ** 0.5);
 
         # create parameters for the model
         #  [no_params, w_mean, w_var, w_n1, w_n2,

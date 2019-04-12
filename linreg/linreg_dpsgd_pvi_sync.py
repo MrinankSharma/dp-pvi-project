@@ -208,11 +208,11 @@ if __name__ == "__main__":
         "num_intervals": 1000,
         "output_base_dir": '',
         "dp_noise_scale": 1,
-        "clipping_bound": 40,
+        "clipping_bound": 10,
         "local_damping": 0,
         "global_damping": 0,
         "max_eps": 1e50,
-        "learning_rate": 1e-6,
+        "learning_rate": 1e-5,
         "local_num_iterations": 50,
         "lot_size": 5,
     }
