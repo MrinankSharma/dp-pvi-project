@@ -89,8 +89,6 @@ def learningRateToInts(cfg):
         return [3, start_value, cfg["alpha"], 0]
 
 
-
-
 if __name__ == "__main__":
     args = parser.parse_args()
     output_base_dir = args.output_base_dir
@@ -142,7 +140,7 @@ if __name__ == "__main__":
                 "alpha": [0.05, 0.03],
             }
         ],
-        "max_eps": [5, 10, 50],
+        "max_eps": [10, 50, 100],
         "convergence_threshold": "disabled",
         "convergence_length": 50
     }

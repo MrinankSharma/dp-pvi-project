@@ -272,7 +272,7 @@ def run_global_dp_analytical_pvi_sync(experiment_setup, seed, all_workers_data, 
         tracker_i = [sum_delta[0], sum_delta[1], current_params[0], current_params[1], KL_loss, current_eps, conv_val,
                      current_learning_rate]
         tracker_vals.append(tracker_i)
-        print("Interval {} done: {}\nConv Val: {}\n".format(i, current_params, conv_val))
+        print("Interval {} done: {}\n Conv Val: {}\n eps:{} \n\n".format(i, current_params, conv_val, current_eps))
         i += 1
 
         if ray.get(ps.get_should_stop.remote()):
