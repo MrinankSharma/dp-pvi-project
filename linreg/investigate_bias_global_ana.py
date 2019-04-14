@@ -78,6 +78,18 @@ def noiseConfigToInt(cfg):
     elif cfg == "noisy_worker":
         return 2
 
+def learningRateToInts(cfg):
+    scheme = cfg["scheme"]
+    start_value = cfg["start_value"]
+    if scheme == "constant":
+        return [1, start_value, 0, 0]
+    elif scheme == "step":
+        return [2, start_value, cfg["factor"], cfg["interval"]]
+    elif scheme == "exponential":
+        return [3, start_value, cfg["alpha"], 0]
+
+
+
 
 if __name__ == "__main__":
     args = parser.parse_args()
@@ -107,7 +119,7 @@ if __name__ == "__main__":
         "dp_noise_scale": [1, 4, 8],
         "clipping_bound": [0.1, 1, 10],
         "local_damping": 0,
-        "learning_rate":[
+        "learning_rate": [
             {
                 "scheme": "constant",
                 "start_value": [0.15, 0.5, 0.85],
@@ -138,9 +150,9 @@ if __name__ == "__main__":
     if testing:
         experiment_setup["N_dp_seeds"] = 1
         experiment_setup["dataset"]["mean"] = [2]
-        experiment_setup["clipping_bound"] = 10
-        experiment_setup["clipping_config"] = "clipped_worker"
-        experiment_setup["noise_config"] = "noisy_worker"
+        experiment_setup["num_intervals"]= 20
+        experiment_setup["num_workers"] = 2
+
         tag = 'testing'
         # should_overwrite = True
 
@@ -231,25 +243,28 @@ if __name__ == "__main__":
                                      full_setup["clipping_config"], full_setup["noise_config"],
                                      full_setup["dp_noise_scale"],
                                      full_setup["clipping_bound"], full_setup["local_damping"],
-                                     full_setup["global_damping"],
                                      exact_params[dataset_indx][0], exact_params[dataset_indx][1]]
+
                 results_array_csv = [eps, eps_var, kl, kl_var, experiment_counter, full_setup["dataset"]["mean"],
                                      clippingConfigToInt(full_setup["clipping_config"]),
                                      noiseConfigToInt(full_setup["noise_config"]),
                                      full_setup["dp_noise_scale"],
                                      full_setup["clipping_bound"], full_setup["local_damping"],
-                                     full_setup["global_damping"],
                                      exact_params[dataset_indx][0], exact_params[dataset_indx][1], experiment_code]
+                results_array_txt.extend(learningRateToInts(full_setup["learning_rate"]))
+                results_array_csv.extend(learningRateToInts(full_setup["learning_rate"]))
                 text_file.write(
                     """eps: {} eps_var: {:.4e} kl: {} kl_var: {:.4e} experiment_counter:{}
                      mean: {}, clipping_config: {}, noise_config: {}, dp_noise_scale: {}, 
-                      clipping_bound: {}, local_damping: {}, global_damping:{}, 
-                      exact_mean_pres: {:.4e}, exact_pres: {:.4e}\n""".format(
+                      clipping_bound: {}, local_damping: {}, 
+                      exact_mean_pres: {:.4e}, exact_pres: {:.4e}, learning_rate_type: {},
+                      learning_rate_start: {}, learning_rate_param1: {}, 
+                      learning_rate_param2: {} \n\n""".format(
                         *results_array_txt))
                 text_file.close()
                 csv_file = open(csv_file_path, "a")
                 csv_file.write(
-                    "{},{},{},{},{},{},{},{},{},{},{},{},{},{},{}\n".format(*results_array_csv))
+                    "{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{}\n".format(*results_array_csv))
                 csv_file.close()
                 experiment_counter += 1
             except Exception, e:

@@ -112,7 +112,7 @@ class Worker(object):
 
     def get_delta(self, params, learning_rate, damping=0.5):
         # centrally update the learning rate
-        self.net.global_damping = 1-learning_rate
+        self.net.global_damping = 1 - learning_rate
         # apply params
         self.net.set_params(self.keys, params)
         # train the network
@@ -241,12 +241,12 @@ def run_global_dp_analytical_pvi_sync(experiment_setup, seed, all_workers_data, 
     }
 
     learning_rate_schedule = generate_learning_rate_schedule(
-        experiment_setup['num_intervals', experiment_setup['learning_rate']])
+        experiment_setup['num_intervals'], experiment_setup['learning_rate'])
 
     workers = [
         Worker.remote(experiment_setup['num_workers'], in_dim, all_workers_data[i],
                       experiment_setup['prior_std'] ** 2, worker_config, experiment_setup['clipping_bound'],
-                      experiment_setup['global_damping'], experiment_setup['dataset']['model_noise_std'] ** 2)
+                      1 - experiment_setup['learning_rate']['start_value'], experiment_setup['dataset']['model_noise_std'] ** 2)
         for i in range(experiment_setup['num_workers'])]
     i = 0
     current_params = ray.get(ps.pull.remote(all_keys))
@@ -261,7 +261,7 @@ def run_global_dp_analytical_pvi_sync(experiment_setup, seed, all_workers_data, 
             for worker in workers]
 
         sum_delta = compute_update(all_keys, ray.get(deltas), global_clipping_bound, experiment_setup['clipping_bound'],
-                                   1-current_learning_rate, global_dp_noise_scale)
+                                   1 - current_learning_rate, global_dp_noise_scale)
         should_stop_priv = accountant.update_privacy_budget()
         current_eps = accountant.current_tracked_val
         ps.push.remote(all_keys, sum_delta)
@@ -269,7 +269,8 @@ def run_global_dp_analytical_pvi_sync(experiment_setup, seed, all_workers_data, 
         conv_val = ray.get(ps.get_conv_val.remote())
         KL_loss = KL_Gaussians(current_params[0], current_params[1], experiment_setup['exact_mean_pres'],
                                experiment_setup['exact_pres'])
-        tracker_i = [sum_delta[0], sum_delta[1], current_params[0], current_params[1], KL_loss, current_eps, conv_val]
+        tracker_i = [sum_delta[0], sum_delta[1], current_params[0], current_params[1], KL_loss, current_eps, conv_val,
+                     current_learning_rate]
         tracker_vals.append(tracker_i)
         print("Interval {} done: {}\nConv Val: {}\n".format(i, current_params, conv_val))
         i += 1
