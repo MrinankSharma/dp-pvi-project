@@ -166,7 +166,6 @@ if __name__ == "__main__":
         print('Duplicate tag being used')
     log_file_path = path + 'results.txt'
     csv_file_path = path + 'results.csv'
-    csv_fixed_file_path = path + 'results_fixed.csv'
 
     setup_file = path + 'setup.json'
     with open(setup_file, 'w') as outfile:
@@ -201,16 +200,16 @@ if __name__ == "__main__":
             print(experiment_code)
 
             if experiment_code in alreadyRunExperiments and not should_overwrite:
-                exp_params = get_experiment_tag_params(csv_file_path, experiment_code)
-                exp_params.insert(1, experiment_setup["max_eps"])
-                csv_fixed_file = open(csv_fixed_file_path, "a")
-                csv_fixed_file.write(
-                    "{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{}\n".format(*exp_params))
-                csv_fixed_file.close()
-                # print("Skipping Experiment")
-                # pprint.pprint(full_setup, width=1)
-                # print("Experiment Skipped \n\n")
-                print(experiment_setup["max_eps"])
+                # csv_fixed_file_path = path + 'results_fixed.csv'
+                # exp_params = get_experiment_tag_params(csv_file_path, experiment_code)
+                # exp_params.insert(1, experiment_setup["max_eps"])
+                # csv_fixed_file = open(csv_fixed_file_path, "a")
+                # csv_fixed_file.write(
+                #     "{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{}\n".format(*exp_params))
+                # csv_fixed_file.close()
+                print("Skipping Experiment")
+                pprint.pprint(full_setup, width=1)
+                print("Experiment Skipped \n\n")
                 continue
 
             try:
