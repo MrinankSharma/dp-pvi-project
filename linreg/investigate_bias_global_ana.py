@@ -9,7 +9,7 @@ import hashlib
 import linreg.data as data
 from linreg.linreg_global_dp_ana_pvi_sync import run_global_dp_analytical_pvi_sync
 from linreg.inference_utils import exact_inference, generateDictCombinations
-from linreg.file_utils import get_experiment_tags_from_csv
+from linreg.file_utils import get_experiment_tags_from_csv, get_experiment_tag_params
 import os
 import ray
 import json
@@ -166,6 +166,7 @@ if __name__ == "__main__":
         print('Duplicate tag being used')
     log_file_path = path + 'results.txt'
     csv_file_path = path + 'results.csv'
+    csv_fixed_file_path = path + 'results_fixed.csv'
 
     setup_file = path + 'setup.json'
     with open(setup_file, 'w') as outfile:
@@ -198,7 +199,14 @@ if __name__ == "__main__":
             full_setup["exact_pres"] = exact_params[dataset_indx][1]
 
             print(experiment_code)
+
             if experiment_code in alreadyRunExperiments and not should_overwrite:
+                exp_params = get_experiment_tag_params(csv_file_path, experiment_code)
+                exp_params.insert(experiment_setup["max_eps"], 0)
+                csv_fixed_file = open(csv_fixed_file_path, "a")
+                csv_fixed_file.write(
+                    "{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{}\n".format(*exp_params))
+                csv_fixed_file_path.close()
                 # print("Skipping Experiment")
                 # pprint.pprint(full_setup, width=1)
                 # print("Experiment Skipped \n\n")
@@ -238,7 +246,7 @@ if __name__ == "__main__":
                 kl_var = np.var(kl_i)
 
                 text_file = open(log_file_path, "a")
-                results_array_txt = [eps, full_setup["max_eps"], eps_var, kl, kl_var, experiment_counter, full_setup["dataset"]["mean"],
+                results_array_txt = [eps,full_setup["max_eps"], eps_var, kl, kl_var, experiment_counter, full_setup["dataset"]["mean"],
                                      full_setup["clipping_config"], full_setup["noise_config"],
                                      full_setup["dp_noise_scale"],
                                      full_setup["clipping_bound"], full_setup["local_damping"],

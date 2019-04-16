@@ -31,3 +31,14 @@ def get_experiment_tags_from_csv(csv_file_path):
             pass
 
     return codes
+
+def get_experiment_tag_params(csv_file_path, exp_str):
+    with open(csv_file_path, 'rb') as csvfile:
+        reader = csv.reader(csvfile, delimiter=',')
+        try:
+            for row in reader:
+                code_index = len(row) - 1 - 4;
+                if row[code_index] == exp_str:
+                    return row
+        except IndexError:
+            pass
