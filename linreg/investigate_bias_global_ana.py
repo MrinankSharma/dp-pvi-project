@@ -78,6 +78,7 @@ def noiseConfigToInt(cfg):
     elif cfg == "noisy_worker":
         return 2
 
+
 def learningRateToInts(cfg):
     scheme = cfg["scheme"]
     start_value = cfg["start_value"]
@@ -148,7 +149,7 @@ if __name__ == "__main__":
     if testing:
         experiment_setup["N_dp_seeds"] = 1
         experiment_setup["dataset"]["mean"] = [2]
-        experiment_setup["num_intervals"]= 20
+        experiment_setup["num_intervals"] = 20
         experiment_setup["num_workers"] = 2
 
         tag = 'testing'
@@ -245,13 +246,15 @@ if __name__ == "__main__":
                 kl_var = np.var(kl_i)
 
                 text_file = open(log_file_path, "a")
-                results_array_txt = [eps,full_setup["max_eps"], eps_var, kl, kl_var, experiment_counter, full_setup["dataset"]["mean"],
+                results_array_txt = [eps, full_setup["max_eps"], eps_var, kl, kl_var, experiment_counter,
+                                     full_setup["dataset"]["mean"],
                                      full_setup["clipping_config"], full_setup["noise_config"],
                                      full_setup["dp_noise_scale"],
                                      full_setup["clipping_bound"], full_setup["local_damping"],
                                      exact_params[dataset_indx][0], exact_params[dataset_indx][1]]
 
-                results_array_csv = [eps,full_setup["max_eps"], eps_var, kl, kl_var, experiment_counter, full_setup["dataset"]["mean"],
+                results_array_csv = [eps, full_setup["max_eps"], eps_var, kl, kl_var, experiment_counter,
+                                     full_setup["dataset"]["mean"],
                                      clippingConfigToInt(full_setup["clipping_config"]),
                                      noiseConfigToInt(full_setup["noise_config"]),
                                      full_setup["dp_noise_scale"],
