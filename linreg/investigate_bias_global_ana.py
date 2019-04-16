@@ -199,9 +199,10 @@ if __name__ == "__main__":
 
             print(experiment_code)
             if experiment_code in alreadyRunExperiments and not should_overwrite:
-                print("Skipping Experiment")
-                pprint.pprint(full_setup, width=1)
-                print("Experiment Skipped \n\n")
+                # print("Skipping Experiment")
+                # pprint.pprint(full_setup, width=1)
+                # print("Experiment Skipped \n\n")
+                print(experiment_setup["max_eps"])
                 continue
 
             try:
@@ -237,13 +238,13 @@ if __name__ == "__main__":
                 kl_var = np.var(kl_i)
 
                 text_file = open(log_file_path, "a")
-                results_array_txt = [eps, eps_var, kl, kl_var, experiment_counter, full_setup["dataset"]["mean"],
+                results_array_txt = [eps, full_setup["max_eps"], eps_var, kl, kl_var, experiment_counter, full_setup["dataset"]["mean"],
                                      full_setup["clipping_config"], full_setup["noise_config"],
                                      full_setup["dp_noise_scale"],
                                      full_setup["clipping_bound"], full_setup["local_damping"],
                                      exact_params[dataset_indx][0], exact_params[dataset_indx][1]]
 
-                results_array_csv = [eps, eps_var, kl, kl_var, experiment_counter, full_setup["dataset"]["mean"],
+                results_array_csv = [eps,full_setup["max_eps"], eps_var, kl, kl_var, experiment_counter, full_setup["dataset"]["mean"],
                                      clippingConfigToInt(full_setup["clipping_config"]),
                                      noiseConfigToInt(full_setup["noise_config"]),
                                      full_setup["dp_noise_scale"],
@@ -252,7 +253,7 @@ if __name__ == "__main__":
                 results_array_txt.extend(learningRateToInts(full_setup["learning_rate"]))
                 results_array_csv.extend(learningRateToInts(full_setup["learning_rate"]))
                 text_file.write(
-                    """eps: {} eps_var: {:.4e} kl: {} kl_var: {:.4e} experiment_counter:{}
+                    """eps: {} max_eps: {} eps_var: {:.4e} kl: {} kl_var: {:.4e} experiment_counter:{}
                      mean: {}, clipping_config: {}, noise_config: {}, dp_noise_scale: {}, 
                       clipping_bound: {}, local_damping: {}, 
                       exact_mean_pres: {:.4e}, exact_pres: {:.4e}, learning_rate_type: {},
@@ -262,7 +263,7 @@ if __name__ == "__main__":
                 text_file.close()
                 csv_file = open(csv_file_path, "a")
                 csv_file.write(
-                    "{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{}\n".format(*results_array_csv))
+                    "{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{}\n".format(*results_array_csv))
                 csv_file.close()
                 experiment_counter += 1
             except Exception, e:
