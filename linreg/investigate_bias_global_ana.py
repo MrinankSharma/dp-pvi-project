@@ -202,7 +202,7 @@ if __name__ == "__main__":
 
             if experiment_code in alreadyRunExperiments and not should_overwrite:
                 exp_params = get_experiment_tag_params(csv_file_path, experiment_code)
-                exp_params.insert(0, experiment_setup["max_eps"])
+                exp_params.insert(1, experiment_setup["max_eps"])
                 csv_fixed_file = open(csv_fixed_file_path, "a")
                 csv_fixed_file.write(
                     "{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{}\n".format(*exp_params))
