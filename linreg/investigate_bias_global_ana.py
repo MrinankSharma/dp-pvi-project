@@ -206,7 +206,7 @@ if __name__ == "__main__":
                 csv_fixed_file = open(csv_fixed_file_path, "a")
                 csv_fixed_file.write(
                     "{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{},{}\n".format(*exp_params))
-                csv_fixed_file_path.close()
+                csv_fixed_file.close()
                 # print("Skipping Experiment")
                 # pprint.pprint(full_setup, width=1)
                 # print("Experiment Skipped \n\n")
