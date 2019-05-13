@@ -56,6 +56,7 @@ class ParameterServer(object):
         self.conv_val = 0
 
     def push(self, keys, values):
+        print(values)
         self.delta_history[self.delta_it_count][0] = values[0]
         self.delta_history[self.delta_it_count][1] = values[1]
         self.delta_it_count += 1
@@ -242,6 +243,8 @@ def run_global_dp_analytical_pvi_sync(experiment_setup, seed, all_workers_data, 
 
     learning_rate_schedule = generate_learning_rate_schedule(
         experiment_setup['num_intervals'], experiment_setup['learning_rate'])
+
+    print(learning_rate_schedule)
 
     workers = [
         Worker.remote(experiment_setup['num_workers'], in_dim, all_workers_data[i],

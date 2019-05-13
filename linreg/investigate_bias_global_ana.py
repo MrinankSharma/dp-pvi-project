@@ -149,11 +149,22 @@ if __name__ == "__main__":
     if testing:
         experiment_setup["N_dp_seeds"] = 1
         experiment_setup["dataset"]["mean"] = [2]
-        experiment_setup["num_intervals"] = 20
-        experiment_setup["num_workers"] = 2
+        experiment_setup["num_intervals"] = 100
+        experiment_setup["dp_noise_scale"] = 8
+        experiment_setup["clipping_bound"] = 5
+        experiment_setup["num_workers"] = 1
+        experiment_setup["learning_rate"] = [
+            {
+                "scheme": "step",
+                "start_value": [0.15],
+                "factor": 0.5,
+                "interval": 20,
+            }
+        ]
+        experiment_setup["max_eps"] = np.inf
 
         tag = 'testing'
-        # should_overwrite = True
+        should_overwrite = True
 
     np.random.seed(experiment_setup['seed'])
     tf.set_random_seed(experiment_setup['seed'])

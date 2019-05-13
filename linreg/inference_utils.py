@@ -97,8 +97,8 @@ def generate_learning_rate_schedule(num_iterations, learning_rate_settings):
         learning_rates = []
         num_intervals = int((num_iterations * 1.0) / interval + 1)
         for i in range(num_intervals):
-            learning_rates.append((start_val * (f ** i)) * np.ones(interval))
-        return np.array(learning_rates[0:num_intervals])
+            learning_rates.extend((start_val * (f ** i)) * np.ones(interval))
+        return np.array(learning_rates[0:num_iterations])
     elif sch == "exponential":
         alpha = learning_rate_settings["alpha"]
         learning_rates = start_val * np.exp(-alpha * np.arange(0, num_iterations))
