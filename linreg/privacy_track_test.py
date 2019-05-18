@@ -1,25 +1,30 @@
-import linreg_models
-import data
+from linreg.log_moment_utils import generate_log_moments
+from linreg.moments_accountant import MomentsAccountant, MomentsAccountantPolicy
 import numpy as np
 
 if __name__ == "__main__":
-    data_func = data.get_toy_1d_shard
     delta = 1e-5
+    N = 1000
+    L_vals = [1, 10, 50, 100, 500]
+    N_epochs = 1000
+    eps_L_values = []
 
-    # Create a parameter server with some random params.
-    x_train, y_train, x_test, y_test = data_func(0, 1)
-    n_train_master = x_train.shape[0]
-    in_dim = x_train.shape[1]
-    print(n_train_master)
-    net = linreg_models.LinReg_MFVI_DPSGD(in_dim, n_train_master, dpsgd_noise_scale=1, lot_size=50,
-                                          num_iterations=100)
-    [best_eps_MA, epsilons_MA, num_evals , epoch_sf] = net.track_privacy_moments_accountant_fixed_delta(n_train_master, 32, 10,
-                                                                                                delta)
+    for L in L_vals:
+        log_moments = generate_log_moments(N, 32, 1, L)
+        accountant = MomentsAccountant(MomentsAccountantPolicy.FIXED_DELTA, 1e-5, np.inf, 32)
+        accountant.log_moments_increment = log_moments
+        eps_vals = []
+        it_per_epoch = int(np.ceil(N / L))
+        print(it_per_epoch)
+        for i in range(N_epochs):
+            for j in range(it_per_epoch):
+                accountant.update_privacy_budget()
+            eps_vals.append(accountant.current_tracked_val)
 
-    [best_eps_SC, epsilons_SC, num_evals, epoch_sf] = net.track_privacy_adv_composition_fixed_delta(n_train_master, 10, delta)
+        eps_L_values.append(eps_vals)
 
-    np.savetxt('plot_files/sc_vals.txt', epsilons_SC)
-    np.savetxt('plot_files/ma_vals.txt', epsilons_MA)
-    np.savetxt('plot_files/epoch_conv.txt', [epoch_sf])
-    print(best_eps_MA)
-    print(best_eps_SC)
+    results = np.array(eps_L_values)
+    np.savetxt('q_exp.csv', results, delimiter=',')
+
+
+

@@ -28,39 +28,6 @@ parser.add_argument("--N-dp-seeds", default=5, type=int,
                     help="output base folder.")
 
 
-def generate_datasets(experiment_setup):
-    dataset_setup = experiment_setup["dataset"]
-    datasets = []
-    exact_params = []
-    combinations = []
-    dataset_setups = []
-    for mean_val in dataset_setup["mean"]:
-        if dataset_setup['dataset'] == 'toy_1d':
-            data_func = lambda idx, N: data.get_toy_1d_shard(idx, N, dataset_setup['data_type'],
-                                                             mean_val,
-                                                             dataset_setup['model_noise_std'],
-                                                             experiment_setup['num_workers'] * dataset_setup[
-                                                                 'points_per_worker'])
-
-        workers_data = [data_func(w_i, no_workers) for w_i in range(no_workers)]
-        x_train = np.array([[]])
-        y_train = np.array([])
-        for worker_data in workers_data:
-            x_train = np.append(x_train, worker_data[0])
-            y_train = np.append(y_train, worker_data[1])
-
-        _, _, exact_mean_pres, exact_pres = exact_inference(x_train, y_train, experiment_setup['prior_std'],
-                                                            dataset_setup['model_noise_std'] ** 2)
-        specific_setup = copy.deepcopy(dataset_setup)
-        specific_setup["mean"] = mean_val
-        exact_params.append([exact_mean_pres, exact_pres])
-        datasets.append(workers_data)
-        combinations.append(mean_val)
-        dataset_setups.append(specific_setup)
-
-    return datasets, exact_params, combinations, dataset_setups
-
-
 def clippingConfigToInt(cfg):
     if cfg == "not_clipped":
         return 0

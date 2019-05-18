@@ -39,7 +39,7 @@ class ParameterServer(object):
             updates[key] += value
 
         if not self.should_stop:
-            self.should_stop = True
+            self.should_stop = False
             for k in keys:
                 val = np.abs(updates[k] / orig_vals[k])
                 if val > self.conv_thres:
@@ -62,7 +62,7 @@ class Worker(object):
         # Initialize the model
         n_train_worker = self.x_train.shape[0]
         self.n_train = n_train_worker
-        self.accountant = MomentsAccountant(MomentsAccountantPolicy.FIXED_DELTA_MAX_EPS, 1e-2, max_eps, 32)
+        self.accountant = MomentsAccountant(MomentsAccountantPolicy.FIXED_DELTA_MAX_EPS, 1e-5, max_eps, 32)
 
         self.net = linreg_models.LinReg_MFVI_DPSGD(
             din, n_train_worker, self.accountant, noise_var=noise_var, no_workers=no_workers, gradient_bound=c,
@@ -136,6 +136,7 @@ def run_dpsgd_pvi_sync(experiment_setup, seed, max_eps, all_workers_data, exact_
         for i in range(experiment_setup['num_workers'])]
     i = 0
     current_params = ray.get(ps.pull.remote(all_keys))
+    print(current_params)
 
     # logging stuff
     path = experiment_setup['output_base_dir'] + 'logs/dpsgd_sync_pvi/' + time.strftime(
@@ -149,6 +150,9 @@ def run_dpsgd_pvi_sync(experiment_setup, seed, max_eps, all_workers_data, exact_
         json.dump(experiment_setup, outfile)
 
     tracker_vals = []
+    KL_loss = KL_Gaussians(current_params[0], current_params[1], exact_params[0], exact_params[1])
+    tracker_i = [0, 0, current_params[0], current_params[1], KL_loss, 0]
+    tracker_vals.append(tracker_i)
 
     while i < experiment_setup['num_intervals']:
         deltas = [
@@ -214,7 +218,7 @@ if __name__ == "__main__":
         "max_eps": 1e50,
         "learning_rate": 1e-5,
         "local_num_iterations": 50,
-        "lot_size": 5,
+        "lot_size": 1,
     }
 
     dataset_setup = experiment_setup["dataset"]

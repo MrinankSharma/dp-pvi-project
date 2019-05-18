@@ -750,7 +750,7 @@ class LinReg_MFVI_DPSGD():
         no_params = self.din
         # initialise worker to prior mean and variance
         init_var = prior_var * np.ones([no_params])
-        init_mean = prior_mean * np.zeros([no_params])
+        init_mean = prior_mean * np.ones([no_params])
         init_n2 = 1.0 / init_var
         init_n1 = init_mean / init_var
 
@@ -919,6 +919,8 @@ class LinReg_MFVI_DPSGD():
         # mean_grad, log_var_grad = self.build_gradient()
         # perform incredibly simple gradient ascent - we are trying to maximise the free energy
         mean_noisy_grad, noisy_log_var_grad = self.build_noisy_partial_gradient()
+        mean_noisy_grad = tf.clip_by_value(mean_noisy_grad, -1000, 1000)
+        noisy_log_var_grad = tf.clip_by_value(noisy_log_var_grad, -1000, 1000)
         update_m = self.w_mean.assign_add(self.learning_rate_mean * mean_noisy_grad)
         update_lv = self.w_log_var.assign_add(self.learning_rate_var * noisy_log_var_grad)
         # approximately true optimal parameters - to check if gradient is small enough

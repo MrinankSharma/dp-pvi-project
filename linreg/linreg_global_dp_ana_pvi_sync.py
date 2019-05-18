@@ -292,6 +292,4 @@ def run_global_dp_analytical_pvi_sync(experiment_setup, seed, all_workers_data, 
     KL_loss = KL_Gaussians(current_params[0], current_params[1], experiment_setup['exact_mean_pres'],
                            experiment_setup['exact_pres'])
 
-    tracker_array = np.array(tracker_vals)
-    np.savetxt(path + 'tracker.csv', tracker_array, delimiter=',')
     return eps, KL_loss, tracker_array
