@@ -47,6 +47,13 @@ class ParameterServer(object):
                 if val > self.conv_thres:
                     self.should_stop = False
 
+        pres_key = 'variational_nat/precision'
+        # reject value if it results in a negative variance.
+        if self.params[pres_key] < 0:
+            for key, value in self.params.iteritems():
+                self.params[key] = orig_vals[key]
+            print('Rejected negative precision')
+
     def pull(self, keys):
         return [self.params[key] for key in keys]
 

@@ -78,7 +78,6 @@ class ParameterServer(object):
         if self.params[pres_key] < 0:
             for key, value in self.params.iteritems():
                 self.params[key] = orig_vals[key]
-
             print('Rejected negative precision')
 
         if not self.should_stop:
