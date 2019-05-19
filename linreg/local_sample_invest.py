@@ -48,14 +48,14 @@ if __name__ == "__main__":
         "output_base_dir": output_base_dir,
         "max_eps": 10,
         "dp_noise_scale": 5,
-        "clipping_bound": [0.25, 0.5, 1, 2, 4, 8],
-        "learning_rate": 0.2,
+        "clipping_bound": [0.25, 0.5, 1, 2, 4, 8, 16],
+        "learning_rate": 0.1,
     }
 
     if testing:
         full_experiment_setup["model_config"] = ["clipped_noisy"]
         full_experiment_setup["N_seeds"] = 2
-        full_experiment_setup["clipping_bound"] = [1, 2]
+        full_experiment_setup["clipping_bound"] = [16]
         full_experiment_setup["num_workers"] = 2
         tag = 'testing'
         should_overwrite = True

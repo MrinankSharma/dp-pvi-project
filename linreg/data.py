@@ -85,7 +85,11 @@ def generate_datasets(experiment_setup):
 def generate_random_dataset(experiment_setup):
     dataset_setup = experiment_setup["dataset"]
     mean_val = np.random.normal(loc=0, scale=experiment_setup["prior_std"])
-    model_noise_std = np.random.uniform(low=0.25, high=2)
+
+    if dataset_setup["model_noise_std"] == 'sample':
+        model_noise_std = np.random.uniform(low=0.5, high=2)
+    else:
+        model_noise_std = dataset_setup["model_noise_std"]
 
     if dataset_setup['dataset'] == 'toy_1d':
         data_func = lambda idx, N: get_toy_1d_shard(idx, N, dataset_setup['data_type'],
