@@ -1389,7 +1389,10 @@ class LinReg_MFVI_DP_analytic():
         self.set_nat_params()
         # get natural params and return
         params = self.params.get_weights()
-        return list(params.keys()), list(params.values())
+        keys = list(params.keys())
+        values = list(params.values())
+        keys, values = zip(*sorted(zip(keys, values), reverse=True))
+        return keys, values
 
     def get_param_diff(self, damping=0.5):
         self.set_nat_params()

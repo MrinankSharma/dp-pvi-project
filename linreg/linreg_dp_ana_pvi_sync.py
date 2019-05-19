@@ -25,6 +25,7 @@ class ParameterServer(object):
         # backed by the object store.
         values = [value.copy() for value in values]
         self.params = dict(zip(keys, values))
+        self.pres_key = keys[1]
         self.should_stop = False
         self.conv_thres = conv_thres
         self.param_it_count = 0.0
@@ -47,9 +48,7 @@ class ParameterServer(object):
                 if val > self.conv_thres:
                     self.should_stop = False
 
-        pres_key = 'variational_nat/precision'
-        # reject value if it results in a negative variance.
-        if self.params[pres_key] < 0:
+        if self.params[self.pres_key] < 0:
             for key, value in self.params.iteritems():
                 self.params[key] = orig_vals[key]
             print('Rejected negative precision')
@@ -175,15 +174,14 @@ def run_dp_analytical_pvi_sync(experiment_setup, seed, all_workers_data, log_mom
                 current_params, damping=(1 - experiment_setup['learning_rate']))
             for worker in workers]
         sum_delta = compute_update(all_keys, ray.get(deltas))
-
         current_eps = ray.get(workers[0].get_privacy_spent.remote())
         ps.push.remote(all_keys, sum_delta)
         current_params = ray.get(ps.pull.remote(all_keys))
-        print("Interval {} done: {}".format(i, current_params))
         i += 1
-
         KL_loss = KL_Gaussians(current_params[0], current_params[1], experiment_setup['exact_mean_pres'],
                                experiment_setup['exact_pres'])
+        print("Interval {} done: {}".format(i, current_params))
+        print("Current KL: {}\n".format(KL_loss))
 
         tracker_i = [sum_delta[0], sum_delta[1], current_params[0], current_params[1], KL_loss, current_eps]
         tracker_vals.append(tracker_i)
@@ -207,4 +205,8 @@ def run_dp_analytical_pvi_sync(experiment_setup, seed, all_workers_data, log_mom
     tracker_array = np.array(tracker_vals)
     np.savetxt(path + 'tracker.csv', tracker_array, delimiter=',')
 
-    return eps, KL_loss, tracker_array
+    n_row, _ = tracker_array.shape
+    average_KL_loss = np.mean(tracker_array[n_row-1-10:n_row-1,4])
+    print("Average KL: {}".format(average_KL_loss))
+
+    return eps, average_KL_loss, tracker_array

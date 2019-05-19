@@ -49,7 +49,7 @@ if __name__ == "__main__":
         "max_eps": 10,
         "dp_noise_scale": 5,
         "clipping_bound": [0.25, 0.5, 1, 2, 4, 8],
-        "learning_rate": 0.5,
+        "learning_rate": 0.2,
     }
 
     if testing:
