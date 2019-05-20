@@ -39,7 +39,7 @@ if __name__ == "__main__":
             "model_noise_std": "sample",
             "points_per_worker": 10,
         },
-        "model_config": "clipped_noisy",
+        "model_config": "clipped_not_noisy",
         "N_seeds": args.N_seeds,
         "prior_std": 5,
         "tag": tag,
