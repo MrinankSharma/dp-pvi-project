@@ -18,6 +18,7 @@ parser.add_argument("--output-base-dir", default='', type=str,
 parser.add_argument("--tag", default='default', type=str)
 parser.add_argument("--overwrite", dest='overwrite', action='store_true')
 parser.add_argument("--testing", dest='testing', action='store_true')
+parser.add_argument("--no-noise", dest='no_noise', action='store_true')
 parser.add_argument("--no-workers", default=20, type=int,
                     help="num_workers.")
 parser.add_argument("--N-seeds", default=30, type=int,
@@ -30,6 +31,12 @@ if __name__ == "__main__":
     testing = args.testing
     tag = args.tag
     no_workers = args.no_workers
+    no_noise = args.no_noise
+
+    if no_noise:
+        config = "clipped_not_noisy"
+    else:
+        config = "clipped_noisy"
 
     full_experiment_setup = {
         "dataset": {
@@ -39,7 +46,7 @@ if __name__ == "__main__":
             "model_noise_std": "sample",
             "points_per_worker": 10,
         },
-        "model_config": "clipped_not_noisy",
+        "model_config": config,
         "N_seeds": args.N_seeds,
         "prior_std": 5,
         "tag": tag,
@@ -48,12 +55,12 @@ if __name__ == "__main__":
         "output_base_dir": output_base_dir,
         "max_eps": 10,
         "dp_noise_scale": 5,
-        "clipping_bound": [0.25, 0.5, 1, 2, 4, 8, 16],
+        "clipping_bound": [0.25, 1, 4, 8, 16, 32, 64],
         "learning_rate": 0.1,
     }
 
     if testing:
-        full_experiment_setup["model_config"] = ["clipped_noisy"]
+        full_experiment_setup["model_config"] = config
         full_experiment_setup["N_seeds"] = 2
         full_experiment_setup["clipping_bound"] = [16]
         full_experiment_setup["num_workers"] = 2

@@ -1127,7 +1127,7 @@ class LinReg_MFVI_DP_analytic():
     def __init__(self, din, n_train, accountant, noise_var=1,
                  prior_mean=0.0, prior_var=1.0,
                  no_workers=1, clipping_bound=10,
-                 dp_noise_scale=0.01, L=1000, model_config="clipped_noisy", single_thread=True):
+                 dp_noise_scale=0.01, model_config="clipped_noisy", single_thread=True):
         self.din = din
         # input and output placeholders
         self.xtrain = tf.placeholder(float_type, [None, din], 'input')
@@ -1230,11 +1230,11 @@ class LinReg_MFVI_DP_analytic():
             xTx_i = xTx_i / self.noise_var + (1 / self.prior_var - 1 / self.w_var) * np.float(1.0 / 10);
             xTy_i = xTy_i / self.noise_var + (
                                                  self.prior_mean / self.prior_var - self.w_mean / self.w_var) * np.float(
-                1.0 / 10);
+                1.0 / 10)
             pres_update, mean_update = tf.py_func(self.clip_sum_values, [xTx_i, xTy_i], (float_type, float_type))
-            pres = pres_update + 1 / self.w_var;
-            mean_pres = mean_update + self.w_mean / self.w_var;
-            update_m = self.w_mean.assign(mean_pres / pres);
+            pres = pres_update + 1 / self.w_var
+            mean_pres = mean_update + self.w_mean / self.w_var
+            update_m = self.w_mean.assign(mean_pres / pres)
             update_v = self.w_var.assign(1 / pres)
             return update_m, update_v, tf.print(pres), tf.print(mean_pres)
 
@@ -1289,7 +1289,7 @@ class LinReg_MFVI_DP_analytic():
 
     def _create_params(self, prior_mean, prior_var):
         no_params = self.din
-        init_var = 2 * np.ones([no_params])
+        init_var = prior_var * np.ones([no_params])
         init_mean = np.zeros([no_params])
         init_n2 = 1.0 / init_var
         init_n1 = init_mean / init_var
