@@ -43,7 +43,7 @@ if __name__ == "__main__":
             "dataset": 'toy_1d',
             "data_type": 'homous',
             "mean_vals": "sample",
-            "model_noise_std": "sample",
+            "model_noise_std": 0.5,
             "points_per_worker": 10,
         },
         "model_config": config,
