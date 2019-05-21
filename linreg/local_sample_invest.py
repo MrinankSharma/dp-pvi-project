@@ -62,7 +62,7 @@ if __name__ == "__main__":
     if testing:
         full_experiment_setup["model_config"] = config
         full_experiment_setup["N_seeds"] = 2
-        full_experiment_setup["clipping_bound"] = [16]
+        full_experiment_setup["clipping_bound"] = [100]
         full_experiment_setup["num_workers"] = 2
         tag = 'testing'
         should_overwrite = True

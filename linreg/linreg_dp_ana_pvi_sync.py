@@ -48,10 +48,11 @@ class ParameterServer(object):
                 if val > self.conv_thres:
                     self.should_stop = False
 
-        if self.params[self.pres_key] < 0:
-            for key, value in self.params.iteritems():
-                self.params[key] = orig_vals[key]
-            print('Rejected negative precision')
+        # This should no longer happen
+        # if self.params[self.pres_key] < 0:
+        #     for key, value in self.params.iteritems():
+        #         self.params[key] = orig_vals[key]
+        #     print('Rejected negative precision')
 
     def pull(self, keys):
         return [self.params[key] for key in keys]

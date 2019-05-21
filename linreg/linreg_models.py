@@ -1225,6 +1225,8 @@ class LinReg_MFVI_DP_analytic():
             xTx_cs, xTy_cs = tf.py_func(self.clip_sum_values, [xTx_i, xTy_i], (float_type, float_type))
             noise = self.noise_dist.sample()
             xTx_noisy = tf.reshape(xTx_cs + tf.cast(noise[0], dtype=float_type), [1])
+            xTx_noisy = tf.clip_by_value(xTx_noisy, 0, np.inf)
+            # alternative way of removing noise issues...
             xTy_noisy = tf.reshape((xTy_cs + tf.cast(noise[1], dtype=float_type)), [1])
         elif self.model_config == "updated_clipped_not_noisy":
             xTx_i = xTx_i / self.noise_var + (1 / self.prior_var - 1 / self.w_var) * np.float(1.0 / 10);
