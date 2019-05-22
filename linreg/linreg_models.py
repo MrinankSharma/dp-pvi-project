@@ -1225,7 +1225,7 @@ class LinReg_MFVI_DP_analytic():
             xTx_cs, xTy_cs = tf.py_func(self.clip_sum_values, [xTx_i, xTy_i], (float_type, float_type))
             noise = self.noise_dist.sample()
             xTx_noisy = tf.reshape(xTx_cs + tf.cast(noise[0], dtype=float_type), [1])
-            xTx_noisy = tf.clip_by_value(xTx_noisy, 0, np.inf)
+            # xTx_noisy = tf.clip_by_value(xTx_noisy, 0, np.inf)
             # alternative way of removing noise issues...
             xTy_noisy = tf.reshape((xTy_cs + tf.cast(noise[1], dtype=float_type)), [1])
         elif self.model_config == "updated_clipped_not_noisy":
@@ -1248,7 +1248,16 @@ class LinReg_MFVI_DP_analytic():
         v = 1.0 / tf.diag_part(Vinv)
         update_m = self.w_mean.assign(m)
         update_v = self.w_var.assign(v)
-        return update_m, update_v
+
+        new_pres = xTx_noisy/self.noise_var
+        new_mp = xTy_noisy/self.noise_var + self.prior_mean/self.prior_var
+        v = 1/new_pres
+        m = new_mp/new_pres
+
+        update_m = self.w_mean.assign(m)
+        update_v = self.w_var.assign(v)
+
+        return update_m, update_v, tf.print(new_pres)
 
     def train(self, x_train, y_train):
         N = x_train.shape[0]
@@ -1262,7 +1271,7 @@ class LinReg_MFVI_DP_analytic():
             return np.array([0, 0, 0])
 
     def get_weights(self):
-        w_mean, w_var = self.sess.run([self.w_mean, self.w_log_var])
+        w_mean, w_var = self.sess.run([self.w_mean, self.w_var])
         return w_mean, w_var
 
     def _build_energy(self):

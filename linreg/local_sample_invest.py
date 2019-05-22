@@ -42,7 +42,7 @@ if __name__ == "__main__":
         "dataset": {
             "dataset": 'toy_1d',
             "data_type": 'homous',
-            "mean_vals": "sample",
+            "mean": "sample",
             "model_noise_std": 0.5,
             "points_per_worker": 10,
         },
@@ -53,17 +53,19 @@ if __name__ == "__main__":
         "num_workers": no_workers,
         "num_intervals": 250,
         "output_base_dir": output_base_dir,
-        "max_eps": 10,
-        "dp_noise_scale": 5,
+        "max_eps": 1000,
+        "dp_noise_scale": 1,
         "clipping_bound": [0.25, 1, 4, 8, 16, 32, 64],
-        "learning_rate": 0.1,
+        "learning_rate": 1,
     }
 
     if testing:
-        full_experiment_setup["model_config"] = config
-        full_experiment_setup["N_seeds"] = 2
-        full_experiment_setup["clipping_bound"] = [100]
-        full_experiment_setup["num_workers"] = 2
+        full_experiment_setup["model_config"] = "clipped_noisy"
+        full_experiment_setup["N_seeds"] = 1
+        full_experiment_setup["clipping_bound"] = [500]
+        full_experiment_setup["num_workers"] = 1
+        full_experiment_setup["dataset"]["mean_vals"] = 10
+
         tag = 'testing'
         should_overwrite = True
 

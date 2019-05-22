@@ -153,7 +153,7 @@ if __name__ == "__main__":
     dp_seeds = np.arange(1, experiment_setup['N_dp_seeds'] + 1)
     ray.init()
 
-    datasets, exact_params, combinations, specific_setups = generate_datasets(experiment_setup)
+    datasets, exact_params, combinations, specific_setups = data.generate_datasets(experiment_setup)
     experiment_setup.pop("dataset")
     experiment_list = generateDictCombinations(experiment_setup)
 

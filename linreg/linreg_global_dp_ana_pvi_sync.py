@@ -243,8 +243,6 @@ def run_global_dp_analytical_pvi_sync(experiment_setup, seed, all_workers_data, 
     learning_rate_schedule = generate_learning_rate_schedule(
         experiment_setup['num_intervals'], experiment_setup['learning_rate'])
 
-    print(learning_rate_schedule)
-
     workers = [
         Worker.remote(experiment_setup['num_workers'], in_dim, all_workers_data[i],
                       experiment_setup['prior_std'] ** 2, worker_config, experiment_setup['clipping_bound'],
@@ -291,4 +289,11 @@ def run_global_dp_analytical_pvi_sync(experiment_setup, seed, all_workers_data, 
     KL_loss = KL_Gaussians(current_params[0], current_params[1], experiment_setup['exact_mean_pres'],
                            experiment_setup['exact_pres'])
 
-    return eps, KL_loss, tracker_array
+    tracker_array = np.array(tracker_vals)
+    np.savetxt(path + 'tracker.csv', tracker_array, delimiter=',')
+
+    n_row, _ = tracker_array.shape
+    average_KL_loss = np.mean(tracker_array[n_row - 1 - 10:n_row - 1, 4])
+    print("Average KL: {}".format(average_KL_loss))
+
+    return eps, average_KL_loss, tracker_array

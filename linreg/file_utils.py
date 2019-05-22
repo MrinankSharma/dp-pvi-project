@@ -19,13 +19,13 @@ def get_params_from_csv(csv_file_path):
 
     return params_searched
 
-def get_experiment_tags_from_csv(csv_file_path):
+def get_experiment_tags_from_csv(csv_file_path, offset_from_end = 4):
     codes = []
     with open(csv_file_path, 'rb') as csvfile:
         reader = csv.reader(csvfile, delimiter=',')
         try:
             for row in reader:
-                code_index = len(row) - 1 - 4;
+                code_index = len(row) - 1 - offset_from_end
                 codes.append(row[code_index])
         except IndexError:
             pass

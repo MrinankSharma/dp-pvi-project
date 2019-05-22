@@ -84,7 +84,11 @@ def generate_datasets(experiment_setup):
 
 def generate_random_dataset(experiment_setup):
     dataset_setup = experiment_setup["dataset"]
-    mean_val = np.random.normal(loc=0, scale=experiment_setup["prior_std"])
+
+    if dataset_setup["mean"] == 'sample':
+        mean_val = np.random.normal(loc=0, scale=experiment_setup["prior_std"])
+    else:
+        mean_val = dataset_setup["mean"]
 
     if dataset_setup["model_noise_std"] == 'sample':
         model_noise_std = np.random.uniform(low=0.5, high=2)
