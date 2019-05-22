@@ -82,11 +82,11 @@ if __name__ == "__main__":
         "num_intervals": 250,
         "output_base_dir": output_base_dir,
         "dp_noise_scale": 5,
-        "clipping_bound": [1, 4, 16, 64, 256],
+        "clipping_bound": [1, 5, 10, 50, 100],
         "local_damping": 0,
         "learning_rate": [{
             "scheme": "constant",
-            "start_value": [0.1, 0.3, 0.5, 0.8],
+            "start_value": [0.1, 0.2, 0.5],
         }],
         "max_eps": 10,
         "convergence_threshold": "disabled",
