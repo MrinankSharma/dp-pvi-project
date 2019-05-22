@@ -86,7 +86,7 @@ if __name__ == "__main__":
         "local_damping": 0,
         "learning_rate": [{
             "scheme": "constant",
-            "start_value": [0.25, 0.5, 0.75],
+            "start_value": [0.1, 0.3, 0.5, 0.8],
         }],
         "max_eps": 10,
         "convergence_threshold": "disabled",
