@@ -99,7 +99,7 @@ if __name__ == "__main__":
         full_experiment_setup["num_intervals"] = 250
         full_experiment_setup["dp_noise_scale"] = 5
         full_experiment_setup["clipping_bound"] = [50, 100]
-        full_experiment_setup["num_workers"] = 20
+        full_experiment_setup["num_workers"] = 2
         full_experiment_setup["learning_rate"] = [{
             "scheme": "constant",
             "start_value": [0.15],
@@ -107,7 +107,7 @@ if __name__ == "__main__":
         full_experiment_setup["max_eps"] = 10
 
         tag = 'testing'
-        should_overwrite = False
+        should_overwrite = True
 
     path = output_base_dir + 'logs/gs_global_sampled_ana/' + tag + '/'
 
@@ -165,7 +165,9 @@ if __name__ == "__main__":
 
             try:
                 pprint.pprint(full_setup, width=1)
+                print("Calc Log Moments")
                 log_moments = generate_log_moments(no_workers, 32, full_experiment_setup['dp_noise_scale'], no_workers)
+                print("Calc Log Moments - Done \n\n")
                 results = run_global_dp_analytical_pvi_sync.remote(full_setup, seed, dataset, log_moments=None)
                 [eps, kl, tracker] = ray.get(results)
                 fname = path + 'e{}.csv'.format(experiment_counter, ind)

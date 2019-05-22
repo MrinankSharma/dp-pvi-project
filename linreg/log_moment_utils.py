@@ -2,6 +2,8 @@ import tensorflow as tf
 import numpy as np
 import math
 
+from repoze.lru import lru_cache
+
 float_type = tf.float32
 int_type = tf.int32
 
@@ -30,7 +32,7 @@ def integral_inf_mp(fn):
     integral, _ = mp.quad(fn, [-mp.inf, mp.inf], error=True)
     return integral
 
-
+@lru_cache(maxsize=100)
 def generate_log_moments(N, max_lambda, noise_scale, lot_size):
     # print('generating log moments')
     L = lot_size
