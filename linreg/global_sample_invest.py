@@ -138,13 +138,12 @@ if __name__ == "__main__":
             alreadyRunExperiments = get_experiment_tags_from_csv(csv_file_path, offset_from_end=0)
 
     experiment_counter = 0
-    for experiment_setup in experiment_list:
-        for ind, seed in enumerate(dp_seeds):
-            # generate dataset for this seed
-            np.random.seed(seed)
-            tf.set_random_seed(seed)
-            dataset, exact_params, sampled_params = data.generate_random_dataset(full_experiment_setup)
+    for ind, seed in enumerate(dp_seeds):
+        np.random.seed(seed)
+        tf.set_random_seed(seed)
+        dataset, exact_params, sampled_params = data.generate_random_dataset(full_experiment_setup)
 
+        for experiment_setup in experiment_list:
             full_setup = copy.deepcopy(experiment_setup)
             full_setup["seed_used"] = seed
             full_setup["dataset"]["mean_val"] = sampled_params[0]
