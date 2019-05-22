@@ -81,7 +81,7 @@ if __name__ == "__main__":
         "num_workers": no_workers,
         "num_intervals": 250,
         "output_base_dir": output_base_dir,
-        "dp_noise_scale": [1],
+        "dp_noise_scale": 5,
         "clipping_bound": [1, 4, 16, 64, 256],
         "local_damping": 0,
         "learning_rate": [{
