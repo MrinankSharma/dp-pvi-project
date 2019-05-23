@@ -296,4 +296,4 @@ def run_global_dp_analytical_pvi_sync(experiment_setup, seed, all_workers_data, 
     average_KL_loss = np.mean(tracker_array[n_row - 1 - 10:n_row - 1, 4])
     print("Average KL: {}".format(average_KL_loss))
 
-    return eps, average_KL_loss, tracker_array
+    return eps, np.asscalar(average_KL_loss), tracker_array
