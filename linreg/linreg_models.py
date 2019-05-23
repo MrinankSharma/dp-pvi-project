@@ -272,6 +272,9 @@ class LinReg_MFVI_analytic():
             noise = np.random.normal(0, self.noise_scale, [2])
             param_deltas = [param_deltas[0] + noise[0], param_deltas[1] + noise[1]]
 
+        # if we are going to make the local precision negative
+        if -(1 - self.global_damping) * param_deltas[1] > self.local_n2:
+            param_deltas[1] = -self.local_n2
         self.local_n1 = old_local_n1 + (1 - self.global_damping) * param_deltas[0]
         self.local_n2 = old_local_n2 + (1 - self.global_damping) * param_deltas[1]
 

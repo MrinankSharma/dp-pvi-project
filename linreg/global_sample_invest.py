@@ -97,12 +97,12 @@ if __name__ == "__main__":
         full_experiment_setup["N_seeds"] = 2
         full_experiment_setup["dataset"]["mean"] = "sample"
         full_experiment_setup["num_intervals"] = 250
-        full_experiment_setup["dp_noise_scale"] = 5
-        full_experiment_setup["clipping_bound"] = [50, 100]
-        full_experiment_setup["num_workers"] = 2
+        full_experiment_setup["dp_noise_scale"] = 10
+        full_experiment_setup["clipping_bound"] = [100]
+        full_experiment_setup["num_workers"] = 1
         full_experiment_setup["learning_rate"] = [{
             "scheme": "constant",
-            "start_value": [0.15],
+            "start_value": [0.5],
         }]
         full_experiment_setup["max_eps"] = 10
 
