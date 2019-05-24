@@ -57,6 +57,9 @@ def learningRateToInts(cfg):
 
 
 if __name__ == "__main__":
+    np.random.seed(42)
+    tf.set_random_seed(42)
+
     args = parser.parse_args()
     output_base_dir = args.output_base_dir
     should_overwrite = args.overwrite
@@ -108,7 +111,7 @@ if __name__ == "__main__":
             "N_seeds": args.N_seeds,
             "prior_std": 5,
             "tag": tag,
-            "num_workers": [8, 16, 32, 64, 128],
+            "num_workers": [10, 20, 30, 40, 50],
             "num_intervals": 250,
             "output_base_dir": output_base_dir,
             "dp_noise_scale": 5,
@@ -143,7 +146,7 @@ if __name__ == "__main__":
         full_experiment_setup["max_eps"] = 10
 
         tag = 'testing'
-        should_overwrite = True
+        # should_overwrite = True
 
     path = output_base_dir + 'logs/gs_global_robust_ana/' + tag + '/'
 
@@ -172,6 +175,7 @@ if __name__ == "__main__":
         else:
             # do not duplicate experiments
             alreadyRunExperiments = get_experiment_tags_from_csv(csv_file_path, offset_from_end=0)
+            print(alreadyRunExperiments)
 
     experiment_counter = 0
     all_results_objects = []
