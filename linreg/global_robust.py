@@ -241,6 +241,7 @@ if __name__ == "__main__":
                         csv_file.write(
                             "{},{},{},{},{},{},{},{},{},{},{},{}\n".format(*results_array))
                         csv_file.close()
+                        experiment_counter += 1
                     all_results_objects = []
 
             except Exception, e:
@@ -266,4 +267,5 @@ if __name__ == "__main__":
             csv_file.write(
                 "{},{},{},{},{},{},{},{},{},{},{},{}\n".format(*results_array))
             csv_file.close()
+            experiment_counter += 1
         all_results_objects = []
