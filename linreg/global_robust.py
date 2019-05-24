@@ -215,26 +215,29 @@ if __name__ == "__main__":
                 experiment_counter += 1
                 all_results_objects.append(results_obj)
 
+                # flush every five experiments.
+                if seed % 5 == 4:
+                    for results_obj_i in all_results_objects:
+                        [eps, kl, tracker] = ray.get(results_obj_i[1])
+                        results_array = results_obj_i[0]
+                        results_array[1] = eps
+                        results_array[2] = kl
+                        experiment_counter = results_array[0]
+                        fname = path + 'e{}.csv'.format(experiment_counter)
+                        np.savetxt(fname, tracker, delimiter=',')
+
+                        text_file = open(log_file_path, "a")
+                        text_file.write(
+                            "experiment_counter:{} eps: {} kl: {} mean: {} noise_e: {} exact_mean_pres: {:.4e} \
+                             exact_pres: {:.4e} c: {} eta: {} num_workers: {} points_per_worker:{} code: {} \n\n".format(
+                                *results_array))
+                        text_file.close()
+                        csv_file = open(csv_file_path, "a")
+                        csv_file.write(
+                            "{},{},{},{},{},{},{},{},{},{},{},{}\n".format(*results_array))
+                        csv_file.close()
+
             except Exception, e:
                 traceback.print_exc()
                 continue
 
-    for results_obj_i in all_results_objects:
-            [eps, kl, tracker] = ray.get(results_obj_i[1])
-            results_array = results_obj_i[0]
-            results_array[1] = eps
-            results_array[2] = kl
-            experiment_counter = results_array[0]
-            fname = path + 'e{}.csv'.format(experiment_counter)
-            np.savetxt(fname, tracker, delimiter=',')
-
-            text_file = open(log_file_path, "a")
-            text_file.write(
-                "experiment_counter:{} eps: {} kl: {} mean: {} noise_e: {} exact_mean_pres: {:.4e} \
-                 exact_pres: {:.4e} c: {} eta: {} num_workers: {} points_per_worker:{} code: {} \n\n".format(
-                    *results_array))
-            text_file.close()
-            csv_file = open(csv_file_path, "a")
-            csv_file.write(
-                "{},{},{},{},{},{},{},{},{},{},{},{}\n".format(*results_array))
-            csv_file.close()
