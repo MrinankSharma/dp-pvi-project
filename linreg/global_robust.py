@@ -200,6 +200,7 @@ if __name__ == "__main__":
             if experiment_code in alreadyRunExperiments and not should_overwrite:
                 print("Skipping Experiment")
                 pprint.pprint(full_setup, width=1)
+                experiment_counter += 1
                 print("Experiment Skipped \n\n")
                 continue
 
