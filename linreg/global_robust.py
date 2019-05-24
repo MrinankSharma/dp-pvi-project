@@ -132,9 +132,9 @@ if __name__ == "__main__":
         full_experiment_setup["num_intervals"] = 250
         full_experiment_setup["dp_noise_scale"] = 10
         full_experiment_setup["clipping_bound"] = {
-                "type": "scaled",
-                "value": 0.5,
-            }
+            "type": "scaled",
+            "value": 0.5,
+        }
         full_experiment_setup["num_workers"] = [2, 4]
         full_experiment_setup["learning_rate"] = [{
             "scheme": "constant",
@@ -209,7 +209,8 @@ if __name__ == "__main__":
                 # set things running so we can get the results later - this ought to boost performance.
                 results = run_global_dp_analytical_pvi_sync.remote(full_setup, seed, dataset, log_moments=None)
                 results_array = [experiment_counter, -1, -1, sampled_params[0], sampled_params[1], exact_params[0],
-                                 exact_params[1], full_setup['clipping_bound'], full_setup['learning_rate']['start_value'],
+                                 exact_params[1], full_setup['clipping_bound'],
+                                 full_setup['learning_rate']['start_value'],
                                  full_setup["num_workers"], full_setup["dataset"]["points_per_worker"], experiment_code]
                 results_obj = [results_array, results]
                 experiment_counter += 1
@@ -236,8 +237,29 @@ if __name__ == "__main__":
                         csv_file.write(
                             "{},{},{},{},{},{},{},{},{},{},{},{}\n".format(*results_array))
                         csv_file.close()
+                    all_results_objects = []
 
             except Exception, e:
                 traceback.print_exc()
                 continue
 
+        for results_obj_i in all_results_objects:
+            [eps, kl, tracker] = ray.get(results_obj_i[1])
+            results_array = results_obj_i[0]
+            results_array[1] = eps
+            results_array[2] = kl
+            experiment_counter = results_array[0]
+            fname = path + 'e{}.csv'.format(experiment_counter)
+            np.savetxt(fname, tracker, delimiter=',')
+
+            text_file = open(log_file_path, "a")
+            text_file.write(
+                "experiment_counter:{} eps: {} kl: {} mean: {} noise_e: {} exact_mean_pres: {:.4e} \
+                 exact_pres: {:.4e} c: {} eta: {} num_workers: {} points_per_worker:{} code: {} \n\n".format(
+                    *results_array))
+            text_file.close()
+            csv_file = open(csv_file_path, "a")
+            csv_file.write(
+                "{},{},{},{},{},{},{},{},{},{},{},{}\n".format(*results_array))
+            csv_file.close()
+        all_results_objects = []
