@@ -188,7 +188,7 @@ if __name__ == "__main__":
             full_setup["dataset"]["model_noise_std"] = sampled_params[1]
             full_setup["exact_mean_pres"] = exact_params[0]
             full_setup["exact_pres"] = exact_params[1]
-            full_setup["clipping_bound"] = full_setup["clipping_bound"]["value"] * full_setup["num_workers"]
+            full_setup["clipping_bound"] = full_setup["clipping_bound"]["value"] * full_setup["dataset"]["points_per_worker"]
             np.random.seed(seed)
             tf.set_random_seed(seed)
             experiment_code = hashlib.sha1(json.dumps(full_setup, sort_keys=True)).hexdigest()
