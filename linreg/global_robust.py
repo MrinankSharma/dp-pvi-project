@@ -25,7 +25,7 @@ parser.add_argument("--testing", dest='testing', action='store_true')
 parser.add_argument("--N-seeds", default=50, type=int,
                     help="output base folder.")
 parser.add_argument("--ppw", dest="ppw", action='store_true')
-parser.add_argument("--exp", dest="exp-to-run", default=0, type=int)
+parser.add_argument("--exp", dest="exp", default=0, type=int)
 
 
 def clippingConfigToInt(cfg):
