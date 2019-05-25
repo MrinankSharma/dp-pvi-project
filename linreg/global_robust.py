@@ -25,6 +25,7 @@ parser.add_argument("--testing", dest='testing', action='store_true')
 parser.add_argument("--N-seeds", default=50, type=int,
                     help="output base folder.")
 parser.add_argument("--ppw", dest="ppw", action='store_true')
+parser.add_argument("--exp", dest="exp-to-run", default=0, type=int)
 
 
 def clippingConfigToInt(cfg):
@@ -65,6 +66,13 @@ if __name__ == "__main__":
     should_overwrite = args.overwrite
     testing = args.testing
     tag = args.tag
+
+    if args.not_noisy:
+        config = "not_noisy"
+        learning_rates = [0.9]
+    else:
+        config = "noisy_worker"
+        learning_rates = [0.1, 0.2, 0.5]
 
     if args.ppw:
         full_experiment_setup = {
@@ -123,6 +131,79 @@ if __name__ == "__main__":
             "learning_rate": [{
                 "scheme": "constant",
                 "start_value": 0.1,
+            }],
+            "max_eps": 10,
+            "convergence_threshold": "disabled",
+            "convergence_length": 50
+        }
+
+    if args.exp == 3:
+        full_experiment_setup = {
+            "dataset": {
+                "dataset": 'toy_1d',
+                "data_type": 'homous',
+                "mean": "sample",
+                "model_noise_std": "sample",
+                "points_per_worker": 10,
+            },
+            "clipping_config": "clipped_worker",
+            "noise_config": ["noisy_worker"],
+            "N_seeds": args.N_seeds,
+            "prior_std": 5,
+            "tag": tag,
+            "num_workers": 20,
+            "num_intervals": 250,
+            "output_base_dir": output_base_dir,
+            "dp_noise_scale": 5,
+            "clipping_bound": {
+                "type": "scaled",
+                "value": 0.5,
+            },
+            "local_damping": 0,
+            "learning_rate": [
+                {
+                    "scheme": "constant",
+                    "start_value": 0.1,
+                },
+                {
+                    "scheme": "constant",
+                    "start_value": 0.2,
+                },
+                {
+                    "scheme": "constant",
+                    "start_value": 0.5,
+                }
+            ],
+            "max_eps": 10,
+            "convergence_threshold": "disabled",
+            "convergence_length": 50
+        }
+    elif args.exp == 4:
+        full_experiment_setup = {
+            "dataset": {
+                "dataset": 'toy_1d',
+                "data_type": 'homous',
+                "mean": "sample",
+                "model_noise_std": "sample",
+                "points_per_worker": 10,
+            },
+            "clipping_config": ["clipped_worker"],
+            "noise_config": ["not_noisy"],
+            "N_seeds": args.N_seeds,
+            "prior_std": 5,
+            "tag": tag,
+            "num_workers": 20,
+            "num_intervals": 450,
+            "output_base_dir": output_base_dir,
+            "dp_noise_scale": 5,
+            "clipping_bound": {
+                "type": "scaled",
+                "value": 0.5,
+            },
+            "local_damping": 0,
+            "learning_rate": [{
+                "scheme": "constant",
+                "start_value": 0.5,
             }],
             "max_eps": 10,
             "convergence_threshold": "disabled",
@@ -188,7 +269,8 @@ if __name__ == "__main__":
             full_setup["dataset"]["model_noise_std"] = sampled_params[1]
             full_setup["exact_mean_pres"] = exact_params[0]
             full_setup["exact_pres"] = exact_params[1]
-            full_setup["clipping_bound"] = full_setup["clipping_bound"]["value"] * full_setup["dataset"]["points_per_worker"]
+            full_setup["clipping_bound"] = full_setup["clipping_bound"]["value"] * full_setup["dataset"][
+                "points_per_worker"]
             np.random.seed(seed)
             tf.set_random_seed(seed)
             experiment_code = hashlib.sha1(json.dumps(full_setup, sort_keys=True)).hexdigest()
