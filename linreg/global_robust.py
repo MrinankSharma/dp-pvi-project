@@ -67,13 +67,6 @@ if __name__ == "__main__":
     testing = args.testing
     tag = args.tag
 
-    if args.not_noisy:
-        config = "not_noisy"
-        learning_rates = [0.9]
-    else:
-        config = "noisy_worker"
-        learning_rates = [0.1, 0.2, 0.5]
-
     if args.ppw:
         full_experiment_setup = {
             "dataset": {
