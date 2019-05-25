@@ -26,7 +26,7 @@ parser.add_argument("--no-workers", default=20, type=int,
                     help="num_workers.")
 parser.add_argument("--N-seeds", default=5, type=int,
                     help="output base folder.")
-parser.add_argument("--not-noisy", dest='testing', action='store_true')
+parser.add_argument("--not-noisy", dest='not_noisy', action='store_true')
 
 def clippingConfigToInt(cfg):
     if cfg == "not_clipped":
