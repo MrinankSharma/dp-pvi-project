@@ -36,13 +36,13 @@ end
 
 figure('pos', [10 10 1000 1000]);
 subplot(221)
-h = histogram(mean_post_estimates, 'BinEdges', -2:0.04:2, 'Normalization', 'pdf')
+h = histogram(mean_post_estimates, 'BinEdges', -2:0.04:2, 'Normalization', 'pdf', 'EdgeAlpha', 0)
 xlabel('$\mu - \mu^*$')
 ylabel('$p$')
 title('Empirical Distribution of Mean Error; $\theta=2$')
 xlim([-2 2.5])
 subplot(222)
-h2 = histogram(var_post_estimates,'BinEdges', -3:0.0009:3, 'Normalization', 'pdf')
+h2 = histogram(var_post_estimates,'BinEdges', -3:0.0009:3, 'Normalization', 'pdf', 'EdgeAlpha', 0)
 xlim([-0.04 0.1])
 xlabel('$\sigma^2 - \sigma^{2,*}$')
 ylabel('$p$')
@@ -83,13 +83,13 @@ for i=1:N_test
     nat2_post_estimates(i) = mean_post_i/var_post_i - mean_post/var_post;
 end
 subplot(223)
-h = histogram(mean_post_estimates, 'BinEdges', -2:0.04:2, 'Normalization', 'pdf')
+h = histogram(mean_post_estimates, 'BinEdges', -2:0.04:2, 'Normalization', 'pdf', 'EdgeAlpha', 0)
 xlabel('$\mu - \mu^*$')
 ylabel('$p$')
 title('Empirical Distribution of Mean Error; $\theta=-2$')
 xlim([-2 2.5])
 subplot(224)
-h2 = histogram(var_post_estimates,'BinEdges', -3:0.0009:3, 'Normalization', 'pdf')
+h2 = histogram(var_post_estimates,'BinEdges', -3:0.0009:3, 'Normalization', 'pdf', 'EdgeAlpha', 0)
 xlim([-0.04 0.1])
 xlabel('$\sigma^2 - \sigma^{2,*}$')
 ylabel('$p$')

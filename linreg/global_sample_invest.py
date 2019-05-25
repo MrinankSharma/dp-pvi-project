@@ -26,7 +26,7 @@ parser.add_argument("--no-workers", default=20, type=int,
                     help="num_workers.")
 parser.add_argument("--N-seeds", default=5, type=int,
                     help="output base folder.")
-
+parser.add_argument("--not-noisy", dest='testing', action='store_true')
 
 def clippingConfigToInt(cfg):
     if cfg == "not_clipped":
@@ -65,6 +65,11 @@ if __name__ == "__main__":
     tag = args.tag
     no_workers = args.no_workers
 
+    if args.not_noisy:
+        config = "not_noisy"
+    else:
+        config = "noisy_worker"
+
     full_experiment_setup = {
         "dataset": {
             "dataset": 'toy_1d',
@@ -74,12 +79,12 @@ if __name__ == "__main__":
             "points_per_worker": 10,
         },
         "clipping_config": ["clipped_worker"],
-        "noise_config": ["noisy_worker"],
+        "noise_config": config,
         "N_seeds": args.N_seeds,
         "prior_std": 5,
         "tag": tag,
         "num_workers": no_workers,
-        "num_intervals": 250,
+        "num_intervals": 500,
         "output_base_dir": output_base_dir,
         "dp_noise_scale": 5,
         "clipping_bound": [1, 5, 10, 50, 100],
@@ -88,7 +93,7 @@ if __name__ == "__main__":
             "scheme": "constant",
             "start_value": [0.1, 0.2, 0.5],
         }],
-        "max_eps": 10,
+        "max_eps": np.inf,
         "convergence_threshold": "disabled",
         "convergence_length": 50
     }
