@@ -234,7 +234,7 @@ if __name__ == "__main__":
                 "scheme": "constant",
                 "start_value": 0.5,
             }],
-            "max_eps": 10,
+            "max_eps": np.inf,
             "convergence_threshold": "disabled",
             "convergence_length": 50
         }
