@@ -148,10 +148,28 @@ if __name__ == "__main__":
             "num_intervals": 250,
             "output_base_dir": output_base_dir,
             "dp_noise_scale": 5,
-            "clipping_bound": {
-                "type": "scaled",
-                "value": 0.5,
-            },
+            "clipping_bound": [
+                {
+                    "type": "scaled",
+                    "value": 0.1,
+                },
+                {
+                    "type": "scaled",
+                    "value": 0.5,
+                },
+                {
+                    "type": "scaled",
+                    "value": 1,
+                },
+                {
+                    "type": "scaled",
+                    "value": 5,
+                },
+                {
+                    "type": "scaled",
+                    "value": 10,
+                },
+            ],
             "local_damping": 0,
             "learning_rate": [
                 {
@@ -189,10 +207,28 @@ if __name__ == "__main__":
             "num_intervals": 450,
             "output_base_dir": output_base_dir,
             "dp_noise_scale": 5,
-            "clipping_bound": {
-                "type": "scaled",
-                "value": 0.5,
-            },
+            "clipping_bound": [
+                {
+                    "type": "scaled",
+                    "value": 0.1,
+                },
+                {
+                    "type": "scaled",
+                    "value": 0.5,
+                },
+                {
+                    "type": "scaled",
+                    "value": 1,
+                },
+                {
+                    "type": "scaled",
+                    "value": 5,
+                },
+                {
+                    "type": "scaled",
+                    "value": 10,
+                },
+            ],
             "local_damping": 0,
             "learning_rate": [{
                 "scheme": "constant",

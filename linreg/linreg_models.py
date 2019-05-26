@@ -282,7 +282,6 @@ class LinReg_MFVI_analytic():
         self.local_n2 = old_local_n2 + (1 - self.global_damping) * param_deltas[1]
 
         # we need to take the effects of teh global damping into account for the local factors.
-
         return param_deltas
 
     def _build_prediction(self):
