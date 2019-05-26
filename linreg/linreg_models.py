@@ -276,8 +276,6 @@ class LinReg_MFVI_analytic():
         if -(1 - self.global_damping) * param_deltas[1] > self.local_n2:
             # avoid issues, add a small amount
             param_deltas[1] = -self.local_n2/(1-self.global_damping) + 0.1
-        elif (1 - self.global_damping) * param_deltas[1] > self.local_n2:
-            param_deltas[1] = self.local_n2/(1-self.global_damping)
         self.local_n1 = old_local_n1 + (1 - self.global_damping) * param_deltas[0]
         self.local_n2 = old_local_n2 + (1 - self.global_damping) * param_deltas[1]
 
