@@ -204,7 +204,7 @@ if __name__ == "__main__":
             "prior_std": 5,
             "tag": tag,
             "num_workers": 20,
-            "num_intervals": 450,
+            "num_intervals": 1000,
             "output_base_dir": output_base_dir,
             "dp_noise_scale": 5,
             "clipping_bound": [
