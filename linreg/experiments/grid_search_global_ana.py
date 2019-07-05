@@ -6,7 +6,7 @@ import argparse
 
 import linreg.data as data
 from linreg_global_dp_ana_pvi_sync import run_global_dp_analytical_pvi_sync
-from log_moment_utils import generate_log_moments
+from linreg.log_moment_utils import generate_log_moments
 from linreg.file_utils import get_params_from_csv
 from linreg.inference_utils import exact_inference
 import itertools

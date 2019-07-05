@@ -1,19 +1,19 @@
-import numpy as np
-import tensorflow as tf
-import traceback
-import pprint
 import argparse
 import copy
 import hashlib
+import json
+import os
+import pprint
+import traceback
+
+import numpy as np
+import ray
+import tensorflow as tf
 
 import linreg.data as data
-from linreg.linreg_global_dp_ana_pvi_sync import run_global_dp_analytical_pvi_sync
-from linreg.inference_utils import generateDictCombinations
+from linreg.experiments.linreg_global_dp_ana_pvi_sync import run_global_dp_analytical_pvi_sync
 from linreg.file_utils import get_experiment_tags_from_csv
-import os
-import ray
-import json
-
+from linreg.inference_utils import generateDictCombinations
 from linreg.log_moment_utils import generate_log_moments
 
 parser = argparse.ArgumentParser(description="grid search for whole client level dp")

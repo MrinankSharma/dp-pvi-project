@@ -1,19 +1,19 @@
-import numpy as np
-import tensorflow as tf
-import traceback
-import pprint
 import argparse
 import copy
 import hashlib
+import json
+import os
+import pprint
+import traceback
+
+import numpy as np
+import ray
+import tensorflow as tf
 
 import linreg.data as data
-from linreg.linreg_global_dp_ana_pvi_sync import run_global_dp_analytical_pvi_sync
-from linreg.inference_utils import generateDictCombinations
+from linreg.experiments.linreg_global_dp_ana_pvi_sync import run_global_dp_analytical_pvi_sync
 from linreg.file_utils import get_experiment_tags_from_csv
-import os
-import ray
-import json
-
+from linreg.inference_utils import generateDictCombinations
 from linreg.log_moment_utils import generate_log_moments
 
 parser = argparse.ArgumentParser(description="grid search for whole client level dp")
@@ -94,7 +94,7 @@ if __name__ == "__main__":
                 "scheme": "constant",
                 "start_value": 0.1,
             }],
-            "max_eps": 10,
+            "max_eps": 50,
             "convergence_threshold": "disabled",
             "convergence_length": 50
         }
@@ -240,23 +240,24 @@ if __name__ == "__main__":
         }
 
     if testing:
-        full_experiment_setup["N_seeds"] = 2
-        full_experiment_setup["dataset"]["mean"] = "sample"
+        full_experiment_setup["N_seeds"] = 1
+        full_experiment_setup["dataset"]["mean"] = 2
+        full_experiment_setup["dataset"]["model_noise_std"] = 2
         full_experiment_setup["num_intervals"] = 250
-        full_experiment_setup["dp_noise_scale"] = 10
+        full_experiment_setup["dp_noise_scale"] = 5
         full_experiment_setup["clipping_bound"] = {
             "type": "scaled",
             "value": 0.5,
         }
-        full_experiment_setup["num_workers"] = [2, 4]
+        full_experiment_setup["num_workers"] = [20]
         full_experiment_setup["learning_rate"] = [{
             "scheme": "constant",
             "start_value": [0.1],
         }]
-        full_experiment_setup["max_eps"] = 10
+        full_experiment_setup["max_eps"] = 50
 
         tag = 'testing'
-        # should_overwrite = True
+        should_overwrite = True
 
     path = output_base_dir + 'logs/gs_global_robust_ana/' + tag + '/'
 
@@ -294,7 +295,7 @@ if __name__ == "__main__":
             full_setup = copy.deepcopy(experiment_setup)
             dataset, exact_params, sampled_params = data.generate_random_dataset(full_setup)
             full_setup["seed_used"] = seed
-            full_setup["dataset"]["mean_val"] = sampled_params[0]
+            full_setup["dataset"]["mean"] = sampled_params[0]
             full_setup["dataset"]["model_noise_std"] = sampled_params[1]
             full_setup["exact_mean_pres"] = exact_params[0]
             full_setup["exact_pres"] = exact_params[1]

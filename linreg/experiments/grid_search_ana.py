@@ -1,19 +1,18 @@
-import numpy as np
-import tensorflow as tf
+import argparse
+import itertools
+import json
+import os
+import time
 import traceback
 
-import argparse
+import numpy as np
+import ray
+import tensorflow as tf
 
 import linreg.data as data
-from linreg.linreg_dp_ana_pvi_sync import run_dp_analytical_pvi_sync
+from linreg.experiments.linreg_dp_ana_pvi_sync import run_dp_analytical_pvi_sync
 from linreg.file_utils import get_params_from_csv
-from linreg.inference_utils import exact_inference, KL_Gaussians
-import itertools
-import time
-import os
-import ray
-import json
-
+from linreg.inference_utils import exact_inference
 from linreg.log_moment_utils import generate_log_moments
 
 parser = argparse.ArgumentParser(description="grid search for whole client level dp")

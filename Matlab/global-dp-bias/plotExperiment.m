@@ -1,5 +1,5 @@
 function plotExperiment(exp_ind, exp_folder, results_mat)
-    filepath = strcat(exp_folder, '/', num2str(exp_ind), '.csv');
+    file_path = strcat(exp_folder, '/', num2str(exp_ind), '.csv')
     exp_ind = exp_ind + 1;
     
     exact_mean = results_mat(exp_ind, 6);

@@ -9,8 +9,8 @@ import os
 import numpy as np
 
 import ray
-import linreg_models
-import data
+import linreg.linreg_models
+import linreg.data
 import tensorflow as tf
 
 parser = argparse.ArgumentParser(description="asynchronous distributed variational training")
@@ -59,7 +59,7 @@ def worker_task(ps, worker_index, no_workers, din, data_func,
 
     # Initialize the model
     n_train_worker = x_train.shape[0]
-    net = linreg_models.LinReg_MFVI_analytic(
+    net = linreg.linreg_models.LinReg_MFVI_analytic(
         din, n_train_worker, init_seed=seed, 
         no_workers=no_workers)
     keys = net.get_params()[0]
@@ -95,12 +95,12 @@ if __name__ == "__main__":
     tf.set_random_seed(seed)
 
     if dataset == 'toy_1d':
-        data_func = data.get_toy_1d_shard
+        data_func = linreg.data.get_toy_1d_shard
     # Create a parameter server with some random params.
     x_train, y_train, x_test, y_test = data_func(0, 1)
     n_train_master = x_train.shape[0]
     in_dim = x_train.shape[1]
-    net = linreg_models.LinReg_MFVI_analytic(in_dim, n_train_master)
+    net = linreg.linreg_models.LinReg_MFVI_analytic(in_dim, n_train_master)
     all_keys, all_values = net.get_params()
     ps = ParameterServer.remote(all_keys, all_values)
     

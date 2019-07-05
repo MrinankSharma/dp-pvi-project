@@ -9,8 +9,8 @@ import numpy as np
 import os
 
 import ray
-import linreg_models
-import data
+import linreg.linreg_models
+import linreg.data
 import tensorflow as tf
 
 parser = argparse.ArgumentParser(description="synchronous distributed variational training.")
@@ -56,7 +56,7 @@ class Worker(object):
             worker_index, no_workers, data_type)
         # Initialize the model
         n_train_worker = x_train.shape[0]
-        self.net = linreg_models.LinReg_MFVI_GRA(
+        self.net = linreg.linreg_models.LinReg_MFVI_analytic(
             din, n_train_worker, 
             init_seed=seed, no_workers=no_workers)
         self.keys = self.net.get_params()[0]
@@ -99,13 +99,13 @@ if __name__ == "__main__":
     tf.set_random_seed(seed)
 
     if dataset == 'toy_1d':
-        data_func = data.get_toy_1d_shard
+        data_func = linreg.data.get_toy_1d_shard
 
     # Create a parameter server with some random params.
     x_train, y_train, x_test, y_test = data_func(0, 1)
     n_train_master = x_train.shape[0]
     in_dim = x_train.shape[1]
-    net = linreg_models.LinReg_MFVI_GRA(in_dim, n_train_master)
+    net = linreg.linreg_models.LinReg_MFVI_analytic(in_dim, n_train_master)
     all_keys, all_values = net.get_params()
     ps = ParameterServer.remote(all_keys, all_values)
     
@@ -117,8 +117,8 @@ if __name__ == "__main__":
     i = 0
     current_params = ray.get(ps.pull.remote(all_keys))
 
-    path_prefix = 'logs/distributed_training/'
-    path = path_prefix + 'gra_pvi_sync_%s_data_%s_seed_%d_no_workers_%d_damping_%.3f/' % (
+    path_prefix = '/tmp/distributed_training/'
+    path = path_prefix + 'pvi_sync_%s_data_%s_seed_%d_no_workers_%d_damping_%.3f/' % (
         dataset, data_type, seed, no_workers, damping)
     if not os.path.exists(path):
         os.makedirs(path)
@@ -128,10 +128,6 @@ if __name__ == "__main__":
     time_fname = path + 'train_time.txt'
     time_file = open(time_fname, 'w', 0)
     time_file.write('%.4f\n' % 0)
-
-    tracker_file = "logs/gra_indiv_terms.txt"
-    if os.path.exists(tracker_file):
-        os.remove(tracker_file)
 
     while i < no_intervals:
         start_time = time.time()

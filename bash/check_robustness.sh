@@ -1,4 +1,4 @@
-#!/bin/bash
+
 
 # set the path directly ....
 export PYTHONPATH='/homes/ms2314/dp-pvi-project'
