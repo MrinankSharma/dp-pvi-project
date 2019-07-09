@@ -1,129 +1,109 @@
 import numpy as np
-import pdb
-import copy
 
-from inference_utils import exact_inference
+import logging
 
+logger = logging.getLogger(__name__)
 
-def get_toy_1d(mean, noise_std, n_train):
-    a = mean
-    # n_train = 1000
-    n_test = 200
-    xtrain = np.random.randn(n_train, 1)
-    ytrain = a * xtrain + noise_std * np.random.randn(n_train, 1)
-    xtest = np.random.randn(n_test, 1)
-    ind = np.argsort(xtest[:, 0])
-    xtest = xtest[ind, :]
-    ytest = a * xtest + 0.5 * np.random.randn(n_test, 1)
-    return xtrain, ytrain.reshape([n_train]), xtest, ytest.reshape([n_test])
+def generate_mean(dataset_options):
+    mean_type = dataset_options["mean"]["type"]
+    try:
+        if mean_type == "sample":
+            mean_val =  np.random.normal(loc=0, scale=dataset_options["prior_std"])
+        elif mean_type == "value":
+            mean_val = dataset_options["mean"]["value"]
+        else:
+            raise ValueError()
+    except (ValueError, KeyError):
+        logger.error("Invalid Mean Options")
 
-# simulate data in multiple shards
-def get_toy_1d_shard_homogeneous(shard_idx, total_shards, mean, noise_std, n_train):
-    X_train, y_train, X_test, y_test = get_toy_1d(mean, noise_std, n_train)
-    N_train = X_train.shape[0]
-    N_per_shard = int(N_train / total_shards)
-    start_ind = shard_idx * N_per_shard
-    end_ind = (shard_idx + 1) * N_per_shard
-    X_i = X_train[start_ind:end_ind, :]
-    y_i = y_train[start_ind:end_ind]
-    return X_i, y_i, X_test, y_test
+    logger.info("Mean Val Generated: {}".format(mean_val))
+    return mean_val
 
-def get_toy_1d_shard_inhomogeneous(shard_idx, total_shards, mean, noise_std, n_train):
-    X_train, y_train, X_test, y_test = get_toy_1d(mean, noise_std, n_train)
-    ind = np.argsort(X_train[:, 0])
-    X_train = X_train[ind, :]
-    y_train = y_train[ind]
-    N_train = X_train.shape[0]
-    N_per_shard = int(N_train / total_shards)
-    start_ind = shard_idx * N_per_shard
-    end_ind = (shard_idx + 1) * N_per_shard
-    X_i = X_train[start_ind:end_ind, :]
-    y_i = y_train[start_ind:end_ind]
-    return X_i, y_i, X_test, y_test
+def generate_noise_std_mean(dataset_options):
+    noise_type = dataset_options["model_noise_std"]["type"]
+    try:
+        if noise_type == "sample":
+            noise_val =  np.random.uniform(dataset_options["model_noise_std"]["min_val"],
+                                     dataset_options["model_noise_std"]["max_val"])
+        elif noise_type == "value":
+            noise_val = dataset_options["model_noise_std"]["value"]
+        else:
+            raise ValueError()
+    except (ValueError, KeyError):
+        logger.error("Invalid Noise STD Options")
 
-# simulate data in multiple shards with homogeneous and inhomogeneous data
-def get_toy_1d_shard(shard_idx, total_shards, option='homous', mean=2, noise_std=1, n_train=50):
-    if option == 'homous':
-        return get_toy_1d_shard_homogeneous(shard_idx, total_shards, mean, noise_std, n_train)
-    elif option == 'inhomous':
-        return get_toy_1d_shard_inhomogeneous(shard_idx, total_shards, mean, noise_std, n_train)
-    else:
-        print 'unknown option, returning nothing!'
-
-def generate_datasets(experiment_setup):
-    dataset_setup = experiment_setup["dataset"]
-    datasets = []
-    exact_params = []
-    combinations = []
-    dataset_setups = []
-    for mean_val in dataset_setup["mean"]:
-        if dataset_setup['dataset'] == 'toy_1d':
-            data_func = lambda idx, N: get_toy_1d_shard(idx, N, dataset_setup['data_type'],
-                                                             mean_val,
-                                                             dataset_setup['model_noise_std'],
-                                                             experiment_setup['num_workers'] * dataset_setup[
-                                                                 'points_per_worker'])
-
-        workers_data = [data_func(w_i, experiment_setup["num_workers"]) for w_i in range(experiment_setup["num_workers"])]
-        x_train = np.array([[]])
-        y_train = np.array([])
-        for worker_data in workers_data:
-            x_train = np.append(x_train, worker_data[0])
-            y_train = np.append(y_train, worker_data[1])
-
-        _, _, exact_mean_pres, exact_pres = exact_inference(x_train, y_train, experiment_setup['prior_std'],
-                                                            dataset_setup['model_noise_std'] ** 2)
-        specific_setup = copy.deepcopy(dataset_setup)
-        specific_setup["mean"] = mean_val
-        exact_params.append([exact_mean_pres, exact_pres])
-        datasets.append(workers_data)
-        combinations.append(mean_val)
-        dataset_setups.append(specific_setup)
-
-    return datasets, exact_params, combinations, dataset_setups
-
-def generate_random_dataset(experiment_setup):
-    dataset_setup = experiment_setup["dataset"]
-
-    if dataset_setup["mean"] == 'sample':
-        mean_val = np.random.normal(loc=0, scale=experiment_setup["prior_std"])
-    else:
-        mean_val = dataset_setup["mean"]
-
-    if dataset_setup["model_noise_std"] == 'sample':
-        model_noise_std = np.random.uniform(low=0.5, high=2)
-    else:
-        model_noise_std = dataset_setup["model_noise_std"]
-
-    if dataset_setup['dataset'] == 'toy_1d':
-        data_func = lambda idx, N: get_toy_1d_shard(idx, N, dataset_setup['data_type'],
-                                                    mean_val,
-                                                    model_noise_std,
-                                                    experiment_setup['num_workers'] * dataset_setup[
-                                                        'points_per_worker'])
-
-    workers_data = [data_func(w_i, experiment_setup["num_workers"]) for w_i in
-                    range(experiment_setup["num_workers"])]
-    x_train = np.array([[]])
-    y_train = np.array([])
-    for worker_data in workers_data:
-        x_train = np.append(x_train, worker_data[0])
-        y_train = np.append(y_train, worker_data[1])
-
-    _, _, exact_mean_pres, exact_pres = exact_inference(x_train, y_train, experiment_setup['prior_std'],
-                                                        model_noise_std ** 2)
-
-    sampled_params = [mean_val, model_noise_std]
-    exact_params = [exact_mean_pres, exact_pres]
-
-    return workers_data, exact_params, sampled_params
+    logger.info("Noise Val Generated: {}".format(noise_val))
+    return noise_val
 
 
-if __name__ == '__main__':
-    res = get_toy_1d_shard(0, 1)
-    pdb.set_trace()
-    res = get_toy_1d_shard(2, 5, 'homous')
-    pdb.set_trace()
-    res = get_toy_1d_shard(4, 10, 'inhomous')
-    pdb.set_trace()
-    # pdb.set_trace()
+def getPointsPerWorker(dataset_options, worker_indx, M):
+    try:
+        if dataset_options["points_per_worker"]["type"] == "uniform":
+            return dataset_options["points_per_worker"]["value"]
+        else:
+            raise ValueError()
+    except (ValueError, KeyError):
+        logger.error("Invalid Points per Worker Options")
+
+def whitenFeature(data_feature):
+    feature = data_feature
+    feature = feature - np.mean(feature)
+    feature = feature / np.std(feature)
+    return feature
+
+def get_workers_data(mean_val, model_noise_std, dataset_options, experiment_options):
+    M = experiment_options["num_workers"]
+    # points to generate per worker
+    N_m = np.array([getPointsPerWorker(dataset_options, i, M) for i in range(M)])
+    N_total = np.sum(N_m)
+    data_indices = np.cumsum(N_m)
+    data_indices = np.insert(data_indices, 0, 0)
+    xtrain_full = np.random.randn(N_total, 1)
+
+    try:
+        if dataset_options["data_type"] == "homous":
+            # currently homogenous
+            pass
+        elif dataset_options["data_type"] == "inhomous":
+            xtrain_full = np.sort(xtrain_full)
+        else:
+            raise ValueError()
+    except (ValueError, KeyError):
+        logger.error("Invalid Data Type Options")
+
+    ytrain_full = mean_val * xtrain_full + model_noise_std * np.random.randn(N_total, 1)
+
+    if dataset_options["whitened"]:
+        logger.info("Data Whitening Applied")
+        xtrain_full = whitenFeature(xtrain_full)
+        ytrain_full = whitenFeature(ytrain_full)
+
+    workers_data = []
+
+    for i in range(M):
+        xtrain_i = xtrain_full[data_indices[i]:data_indices[i+1]]
+        ytrain_i = ytrain_full[data_indices[i]:data_indices[i + 1]]
+        workers_data.append((i, xtrain_i, ytrain_i))
+
+
+def generate_random_dataset(dataset_options, experiment_options):
+    mean_val = generate_mean(dataset_options)
+    model_noise_std = generate_noise_std_mean(dataset_options)
+    workers_data = get_workers_data(mean_val, model_noise_std, dataset_options, experiment_options)
+
+        #
+        # workers_data = [data_func(w_i, experiment_setup["num_workers"]) for w_i in
+        #                 range(experiment_setup["num_workers"])]
+        # x_train = np.array([[]])
+        # y_train = np.array([])
+        # for worker_data in workers_data:
+        #     x_train = np.append(x_train, worker_data[0])
+        #     y_train = np.append(y_train, worker_data[1])
+        #
+        # _, _, exact_mean_pres, exact_pres = exact_inference(x_train, y_train, experiment_setup['prior_std'],
+        #                                                     model_noise_std ** 2)
+        #
+        # sampled_params = [mean_val, model_noise_std]
+        # exact_params = [exact_mean_pres, exact_pres]
+        #
+        # return workers_data, exact_params, sampled_params

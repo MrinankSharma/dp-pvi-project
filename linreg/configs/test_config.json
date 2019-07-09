@@ -1,7 +1,3 @@
 {
-  "clipping": {
-    "location": "worker",
-    "type": "scaled_ppw",
-    "value": 10
-  }
+
 }
